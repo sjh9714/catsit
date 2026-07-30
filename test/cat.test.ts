@@ -65,8 +65,10 @@ async function runLifecycle(mode: RenderMode): Promise<void> {
     await feed(`\x1b[2;1H\x1b[2K\x1b[36mrepaint tick ${i}\x1b[0m`);
   }
 
-  // a swallowed keypress and a paste
-  animator.onSwallow();
+  // swallowed keypresses (guard mode): eaten-text bubble + first-time hint
+  animator.onSwallow("hello");
+  await pump();
+  animator.onSwallow(" 고양이");
   await pump();
   now += 500;
   animator.tick();
@@ -76,6 +78,13 @@ async function runLifecycle(mode: RenderMode): Promise<void> {
   now += 800;
   animator.tick();
   await pump();
+  // let the bubble and the hint both expire while the app repaints beneath
+  for (let i = 0; i < 25; i++) {
+    now += 200;
+    animator.tick();
+    await pump();
+    await feed(`\x1b[3;1H\x1b[2K\x1b[35mbubble-phase repaint ${i}\x1b[0m`);
+  }
 
   // needs_human: alert + meow bubble, then walk-out to hidden
   animator.onState({ kind: "needs_human", reason: "permission" });

@@ -6,7 +6,9 @@
 // error — the cat gets up, meows, and steps aside.
 
 import fs from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "./args.js";
 import { Compositor } from "./compositor.js";
 import { runDemoAgent } from "./demo.js";
 import { ClaudeScreenDetector } from "./detect/screen.js";
@@ -20,9 +22,12 @@ import { StateMachine } from "./state.js";
 
 const HELP = `catsit — a cat that babysits your AI agent so you don't have to.
 
-While the agent works, the cat sits on your terminal and swallows your
-typing ("not yet"). The moment you're needed — permission prompt, question,
-done — the cat gets up, meows, and steps aside ("your turn").
+While the agent works, a cat sits on your terminal. If the cat is loafing,
+nothing needs you. The moment you're needed — permission prompt, question,
+done — the cat gets up, meows, and steps aside.
+
+By default the cat NEVER touches your input: typing, message queueing and
+steering all work exactly as without catsit.
 
 Usage:
   catsit <command> [args...]     e.g.  catsit claude
@@ -30,60 +35,64 @@ Usage:
   catsit --demo                  try it with a bundled fake agent (no tokens)
 
 Flags (before the command):
-  --no-swallow   decorative cat only; never gates keystrokes
+  --guard        gatekeeper mode: while the agent works, the cat swallows
+                 your typing (shows what it ate; ctrl+g shoos it).
+                 Control keys always pass through instantly.
   --no-cat       no overlay at all (plain transparent wrapper)
   --quiet        no bell when the cat gets up
   -h, --help     show this help
   -v, --version  show version
-
-Keys while the cat is sitting:
-  ctrl+g         shoo the cat away for the rest of the session
-  ctrl+c / esc   always pass through instantly — the cat never blocks these
 `;
-
-interface Flags {
-  noCat: boolean;
-  noSwallow: boolean;
-  quiet: boolean;
-}
-
-function parseArgs(argv: string[]): { flags: Flags; cmd: string; args: string[] } | null {
-  const flags: Flags = { noCat: false, noSwallow: false, quiet: false };
-  let i = 0;
-  for (; i < argv.length; i++) {
-    const a = argv[i]!;
-    if (a === "--") {
-      i++;
-      break;
-    }
-    if (a === "--no-cat") flags.noCat = true;
-    else if (a === "--no-swallow") flags.noSwallow = true;
-    else if (a === "--quiet") flags.quiet = true;
-    else if (a === "--demo") {
-      // wrap ourselves running the bundled fake agent
-      return { flags, cmd: process.execPath, args: [fileURLToPath(import.meta.url), "--demo-child"] };
-    } else if (a === "-h" || a === "--help") {
-      process.stdout.write(HELP);
-      process.exit(0);
-    } else if (a === "-v" || a === "--version") {
-      process.stdout.write("catsit 0.1.0\n");
-      process.exit(0);
-    } else break;
-  }
-  if (i >= argv.length) return null;
-  return { flags, cmd: argv[i]!, args: argv.slice(i + 1) };
-}
 
 if (process.argv[2] === "--demo-child") {
   await runDemoAgent();
 }
 
+/** Resolve the command like a shell would, so typos fail loudly (exit 127). */
+function resolveCommand(cmd: string): string | null {
+  const check = (p: string): boolean => {
+    try {
+      fs.accessSync(p, fs.constants.X_OK);
+      return fs.statSync(p).isFile();
+    } catch {
+      return false;
+    }
+  };
+  if (cmd.includes("/")) return check(cmd) ? cmd : null;
+  for (const dir of (process.env["PATH"] ?? "").split(path.delimiter)) {
+    if (!dir) continue;
+    const p = path.join(dir, cmd);
+    if (check(p)) return p;
+  }
+  return null;
+}
+
 const parsed = parseArgs(process.argv.slice(2));
-if (!parsed) {
+if (parsed.kind === "help") {
   process.stdout.write(HELP);
+  process.exit(process.argv.length > 2 ? 0 : 2);
+}
+if (parsed.kind === "version") {
+  process.stdout.write("catsit 0.2.0\n");
+  process.exit(0);
+}
+if (parsed.kind === "error") {
+  process.stderr.write(parsed.message + "\n");
+  if (parsed.hint) process.stderr.write(parsed.hint + "\n");
   process.exit(2);
 }
-const { flags, cmd, args } = parsed;
+
+const flags = parsed.flags;
+const { cmd, args } =
+  parsed.kind === "demo"
+    ? { cmd: process.execPath, args: [fileURLToPath(import.meta.url), "--demo-child"] }
+    : parsed;
+
+const resolved = resolveCommand(cmd);
+if (!resolved) {
+  process.stderr.write(`catsit: command not found: ${cmd}\n`);
+  process.exit(127);
+}
 
 const cols = process.stdout.columns || 80;
 const rows = process.stdout.rows || 24;
@@ -122,12 +131,12 @@ const guard = new TerminalGuard((s) => process.stdout.write(s), {
   onAltScreen: () => compositor.screen.onAltScreen(),
 });
 
-const child = spawnChild(cmd, args, cols, rows);
+const child = spawnChild(resolved, args, cols, rows);
 guard.arm();
 
 const sm = new StateMachine();
 const detector = new ClaudeScreenDetector();
-const gate = new InputGate(() => !flags.noSwallow && !flags.noCat && sm.gateClosed);
+const gate = new InputGate(() => flags.guard && !flags.noCat && sm.gateClosed);
 if (debugLog) {
   sm.onChange((n, p) =>
     debugLog(`state ${p.kind}${"reason" in p ? ":" + (p as { reason: string }).reason : ""} -> ${n.kind}${"reason" in n ? ":" + (n as { reason: string }).reason : ""}`),
@@ -201,7 +210,7 @@ process.stdin.on("data", (d: Buffer) => {
   if (r.pass) child.write(r.pass);
   if (r.shooRequested) sm.shoo();
   if (r.pasteSwallowed) animator?.onPaste();
-  else if (r.swallowed > 0) animator?.onSwallow();
+  else if (r.swallowed > 0) animator?.onSwallow(r.swallowedText);
 });
 process.stdin.resume();
 

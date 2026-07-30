@@ -40,16 +40,18 @@ describe("InputGate — safety invariants (gated)", () => {
     expect(r.pass).toBe("\x1bOP\x1bx");
   });
 
-  it("swallows printables, Enter, Tab, Backspace", () => {
+  it("swallows printables, Enter, Tab, Backspace and reports what it ate", () => {
     const r = gate(true).process(B("hi\r\tx\x7f"));
     expect(r.pass).toBe("");
     expect(r.swallowed).toBe(6);
+    expect(r.swallowedText).toBe("hi↵⇥x⌫");
   });
 
   it("swallows multibyte characters as single units", () => {
     const r = gate(true).process(Buffer.from("한글🐈", "utf8"));
     expect(r.pass).toBe("");
     expect(r.swallowed).toBe(3);
+    expect(r.swallowedText).toBe("한글🐈");
   });
 
   it("intercepts Ctrl+G as shoo while gated", () => {
@@ -62,6 +64,7 @@ describe("InputGate — safety invariants (gated)", () => {
     const r = gate(true).process(B("\x1b[200~pasted stuff\rmore\x1b[201~"));
     expect(r.pass).toBe("");
     expect(r.pasteSwallowed).toBe(true);
+    expect(r.swallowedText).toBe("(paste)");
   });
 
   it("handles a paste split across reads", () => {

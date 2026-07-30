@@ -9,6 +9,8 @@ The moment you're needed — permission prompt, question, done — the cat gets 
 
 <img src="docs/assets/demo.gif" alt="catsit demo: a pixel tuxedo cat loafs on the terminal while Claude Code works, then gets up and meows when a permission prompt appears" width="720">
 
+<sub>The demo shows <code>--guard</code> mode. By default, catsit never touches your input.</sub>
+
 [한국어](README.ko.md) · [日本語](README.ja.md) · [简体中文](README.zh-CN.md)
 
 </div>
@@ -44,15 +46,28 @@ catsit inverts the notification. The cat's **presence** is the signal:
 
 If you can see the cat, you can ignore the terminal. That's the deal.
 
-## The cat never gets in the way
+## The cat never touches your input
 
-The gate is built to be impossible to regret:
+By default catsit is **watch-only**: typing, message queueing, steering
+mid-task — every keystroke reaches your agent exactly as it would without
+catsit. The cat is pure signal.
 
-- `ctrl+c`, `ctrl+d`, `esc`, arrows, every control key — **always pass through instantly.** The cat only ever swallows printable typing and Enter.
-- The moment a permission prompt is detected, the gate opens **before** any animation runs.
-- If the state is unknown, the gate is open. If anything inside catsit breaks, it permanently degrades to a transparent passthrough — the cat dies, your session doesn't.
+### `--guard`: gatekeeper mode (opt-in)
+
+Want the cat to actually stop you from micromanaging? `catsit --guard claude`:
+
+- While the agent works, the cat swallows printable typing and Enter — and
+  **shows what it ate** in a little bubble (`🐟 hell…`), so a blocked key
+  never looks like a bug. The first catch comes with a hint:
+  `cat is guarding · ctrl+g to shoo`.
+- `ctrl+c`, `ctrl+d`, `esc`, arrows, every control key — **always pass
+  through instantly**, even in guard mode.
+- The moment a permission prompt is detected, the gate opens **before** any
+  animation runs.
+- If the state is unknown, the gate is open. If anything inside catsit
+  breaks, it permanently degrades to a transparent passthrough — the cat
+  dies, your session doesn't.
 - `ctrl+g` shoos the cat away for the rest of the session.
-- `--no-swallow` keeps the cat purely decorative.
 
 ## How it looks where you are
 
@@ -83,8 +98,9 @@ Two runtime dependencies. Node 20+. macOS & Linux.
 
 ```
 catsit <command> [args...]   wrap any agent CLI (claude today; more soon)
-catsit --demo                bundled fake agent, for trying it out
-  --no-swallow               cat never gates keystrokes
+catsit --demo                bundled fake agent, for trying it out (guard on)
+  --guard                    gatekeeper mode: the cat swallows typing while
+                             the agent works (ctrl+g shoos it)
   --no-cat                   no overlay at all
   --quiet                    no bell when the cat gets up
 ```
@@ -92,6 +108,10 @@ catsit --demo                bundled fake agent, for trying it out
 ## FAQ
 
 **Why "catsit"?** The cat sits on your terminal, and it cat-sits your agent.
+
+**Can I still queue messages while Claude works?** Yes — the default mode
+never intercepts input, so typing-to-queue and steering work untouched.
+`--guard` exists precisely for when you *want* to be stopped.
 
 **Codex / Gemini CLI / opencode?** Planned — the detector is an interface,
 and the transcript channel is Claude-specific but optional. PRs welcome.

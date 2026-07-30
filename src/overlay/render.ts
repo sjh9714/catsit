@@ -157,7 +157,7 @@ export class SpriteRenderer {
 }
 
 /** Truncate a string to fit `cols` terminal columns (wide chars count 2, combining marks 0). */
-function clipColumns(line: string, cols: number): string {
+export function clipColumns(line: string, cols: number): string {
   let used = 0;
   let out = "";
   for (const ch of line) {

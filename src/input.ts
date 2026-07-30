@@ -14,6 +14,8 @@ export interface GateResult {
   pass: string;
   /** Number of typed units the cat swallowed (drives the tail-flick). */
   swallowed: number;
+  /** What the cat swallowed, for the feedback bubble ("hell", "↵", "⌫"...). */
+  swallowedText: string;
   /** A whole paste was swallowed (drives the gulp animation). */
   pasteSwallowed: boolean;
   /** Ctrl+G was pressed while gated. */
@@ -31,7 +33,7 @@ export class InputGate {
   constructor(private isGated: () => boolean) {}
 
   process(data: Buffer): GateResult {
-    const res: GateResult = { pass: "", swallowed: 0, pasteSwallowed: false, shooRequested: false };
+    const res: GateResult = { pass: "", swallowed: 0, swallowedText: "", pasteSwallowed: false, shooRequested: false };
     const buf = this.pending.length ? Buffer.concat([this.pending, data]) : data;
     this.pending = Buffer.alloc(0);
     const gated = this.isGated();
@@ -53,6 +55,7 @@ export class InputGate {
         this.inPaste = false;
         if (gated) {
           res.pasteSwallowed = true;
+          res.swallowedText += "(paste)";
         } else {
           res.pass += this.pasteBuf;
         }
@@ -101,6 +104,7 @@ export class InputGate {
         }
         if (b === 0x0d || b === 0x0a || b === 0x09 || b === 0x7f || b === 0x08) {
           res.swallowed++; // Enter / Tab / Backspace are "typing"
+          res.swallowedText += b === 0x09 ? "⇥" : b === 0x0d || b === 0x0a ? "↵" : "⌫";
           i++;
           continue;
         }
@@ -117,8 +121,12 @@ export class InputGate {
       }
       const ch = buf.subarray(i, i + len).toString("utf8");
       i += len;
-      if (gated) res.swallowed++;
-      else res.pass += ch;
+      if (gated) {
+        res.swallowed++;
+        res.swallowedText += ch;
+      } else {
+        res.pass += ch;
+      }
     }
     return res;
   }

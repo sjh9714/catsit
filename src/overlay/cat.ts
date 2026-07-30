@@ -5,7 +5,7 @@
 import type { Compositor, Overlay } from "../compositor.js";
 import type { Mirror } from "../mirror.js";
 import type { CatState } from "../state.js";
-import { CAT_COLS, CAT_ROWS, SpriteRenderer } from "./render.js";
+import { CAT_COLS, CAT_ROWS, clipColumns, SpriteRenderer } from "./render.js";
 import type { FrameName } from "./sprites.js";
 
 type Anim =
@@ -21,6 +21,8 @@ const TICK_MS = 200;
 const WALK_STEPS = 6;
 const SLEEP_AFTER_MS = 90_000;
 const MEOW_HOLD_MS = 1400;
+export const BUBBLE_HOLD_MS = 1400;
+export const HINT_HOLD_MS = 4000;
 
 export class CatAnimator {
   private anim: Anim = { kind: "hidden" };
@@ -76,18 +78,39 @@ export class CatAnimator {
     }
   }
 
-  /** A keypress was swallowed — tail flick. */
-  onSwallow(): void {
-    if (this.anim.kind === "loaf") {
-      this.anim = { kind: "flick", until: this.now() + 450 };
-      this.render();
+  // feedback bubble state (guard mode): what the cat just ate, plus a
+  // one-time hint so a blocked keystroke never reads as a bug
+  private bubbleText = "";
+  private bubbleUntil = 0;
+  private hintUntil = 0;
+  private hintShown = false;
+
+  /** A keypress was swallowed — tail flick + show what was eaten. */
+  onSwallow(text = ""): void {
+    if (this.anim.kind !== "loaf" && this.anim.kind !== "flick" && this.anim.kind !== "gulp") return;
+    const t = this.now();
+    this.bubbleText = t < this.bubbleUntil ? this.bubbleText + text : text;
+    this.bubbleText = [...this.bubbleText].slice(-8).join("");
+    this.bubbleUntil = t + BUBBLE_HOLD_MS;
+    if (!this.hintShown) {
+      this.hintShown = true;
+      this.hintUntil = t + HINT_HOLD_MS;
     }
+    if (this.anim.kind === "loaf") this.anim = { kind: "flick", until: t + 450 };
+    this.render();
   }
 
   /** A whole paste was swallowed — gulp. */
   onPaste(): void {
     if (this.anim.kind === "loaf" || this.anim.kind === "flick") {
-      this.anim = { kind: "gulp", until: this.now() + 700 };
+      const t = this.now();
+      this.bubbleText = "(paste)";
+      this.bubbleUntil = t + BUBBLE_HOLD_MS;
+      if (!this.hintShown) {
+        this.hintShown = true;
+        this.hintUntil = t + HINT_HOLD_MS;
+      }
+      this.anim = { kind: "gulp", until: t + 700 };
       this.render();
     }
   }
@@ -186,7 +209,14 @@ export class CatAnimator {
   // One persistent overlay object whose draw parameters mutate: the
   // compositor sees the same instance across frames (no clear/re-add churn),
   // and the kitty renderer can replace placements atomically.
-  private cur = { frame: "loaf1" as FrameName, cellX: 0, cellY: 0, showMeow: false };
+  private cur = {
+    frame: "loaf1" as FrameName,
+    cellX: 0,
+    cellY: 0,
+    showMeow: false,
+    bubble: null as string | null,
+    hint: false,
+  };
   private overlayObj: Overlay | null = null;
   private lastRenderKey = "";
 
@@ -194,14 +224,13 @@ export class CatAnimator {
     if (this.overlayObj) return this.overlayObj;
     const renderer = this.opts.renderer;
     const cur = this.cur;
-    const damages = () => renderer.modeName !== "kitty" || cur.showMeow;
+    const damages = () => renderer.modeName !== "kitty" || cur.showMeow || cur.bubble !== null || cur.hint;
     this.overlayObj = {
       get damagesCells() {
         return damages();
       },
-      // The rect must cover EVERYTHING draw() can paint — including the meow
-      // bubble, which sits to the LEFT of the cat (cellX-7) — or hiding the
-      // overlay leaves orphaned cells behind.
+      // The rect must cover EVERYTHING draw() can paint — bubbles and the
+      // hint line included — or hiding the overlay leaves orphaned cells.
       rect: () => ({
         x: cur.cellX - 8,
         y: cur.cellY - 1,
@@ -210,9 +239,19 @@ export class CatAnimator {
       }),
       draw: (cols, rows) => {
         let s = renderer.draw({ frame: cur.frame, cellX: cur.cellX, cellY: cur.cellY, cols, rows });
+        const bubbleRow = Math.max(1, cur.cellY); // 1-based CUP row = 0-based cellY-1
+        const bx = Math.max(0, cur.cellX - 8);
         if (cur.showMeow) {
-          const bx = Math.max(0, cur.cellX - 7);
-          s += `\x1b[${Math.max(1, cur.cellY)};${bx + 1}H\x1b[0;1;38;2;255;220;120m mew! \x1b[0m`;
+          s += `\x1b[${bubbleRow};${bx + 2}H\x1b[0;1;38;2;255;220;120m mew! \x1b[0m`;
+        } else if (cur.bubble !== null) {
+          // what the cat just ate (guard mode)
+          s += `\x1b[${bubbleRow};${bx + 1}H\x1b[0;38;2;30;30;30;48;2;255;220;120m 🐟 ${clipColumns(cur.bubble, 8)} \x1b[0m`;
+        }
+        if (cur.hint) {
+          const hintRow = cur.cellY + CAT_ROWS + 1; // 1-based; last row of the rect
+          if (hintRow >= 1 && hintRow <= rows) {
+            s += `\x1b[${hintRow};${bx + 1}H\x1b[0;2m${clipColumns(" cat is guarding · ctrl+g to shoo", CAT_COLS + 9)}\x1b[0m`;
+          }
         }
         return s;
       },
@@ -228,7 +267,9 @@ export class CatAnimator {
     this.cur.cellX = this.xOffset(this.opts.mirror.cols);
     this.cur.cellY = this.yAnchor(this.opts.mirror.rows);
     this.cur.showMeow = this.anim.kind === "alert";
-    const key = `${this.cur.frame}|${this.cur.cellX}|${this.cur.cellY}|${this.cur.showMeow}`;
+    this.cur.bubble = t < this.bubbleUntil && !this.cur.showMeow ? this.bubbleText : null;
+    this.cur.hint = t < this.hintUntil && !this.cur.showMeow;
+    const key = `${this.cur.frame}|${this.cur.cellX}|${this.cur.cellY}|${this.cur.showMeow}|${this.cur.bubble ?? ""}|${this.cur.hint}`;
     if (key === this.lastRenderKey) return; // nothing changed; forwards keep it drawn
     this.lastRenderKey = key;
     this.opts.compositor.setOverlay(this.ensureOverlay());
