@@ -37,7 +37,10 @@ async function busy(seconds: number, label: string): Promise<void> {
 }
 
 async function permission(seconds: number): Promise<void> {
-  frame([
+  // like the real Claude Code, the permission prompt renders just above the
+  // input box — the detector only trusts the bottom of the screen
+  frame([]);
+  const lines = [
     "\x1b[1mBash command\x1b[0m",
     "",
     "  npm test",
@@ -46,7 +49,8 @@ async function permission(seconds: number): Promise<void> {
     "\x1b[36m❯ 1. Yes\x1b[0m",
     "  2. Yes, and don't ask again for npm test",
     "  3. No, and tell Claude what to do differently",
-  ]);
+  ];
+  lines.forEach((l, i) => w(`\x1b[${ROWS - 4 - lines.length + i};1H  ` + l));
   await sleep(seconds * 1000);
 }
 

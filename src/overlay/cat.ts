@@ -35,6 +35,7 @@ export class CatAnimator {
       renderer: SpriteRenderer;
       bell: () => void;
       now?: () => number;
+      log?: (msg: string) => void;
     },
   ) {}
 
@@ -52,6 +53,7 @@ export class CatAnimator {
   /** Wire to StateMachine.onChange. */
   onState(next: CatState): void {
     if (this.stopped) return;
+    this.opts.log?.(`anim<-state ${next.kind}${"reason" in next ? ":" + next.reason : ""} (anim=${this.anim.kind})`);
     switch (next.kind) {
       case "working":
         if (this.anim.kind === "hidden" || this.anim.kind === "walk-out") {
@@ -94,7 +96,8 @@ export class CatAnimator {
     return this.opts.now?.() ?? Date.now();
   }
 
-  private tick(): void {
+  /** One animation step. Public so tests can drive time deterministically. */
+  tick(): void {
     if (this.stopped) return;
     this.tickNo++;
     const t = this.now();
@@ -110,6 +113,7 @@ export class CatAnimator {
         if (this.anim.step >= WALK_STEPS) {
           this.anim = { kind: "hidden" };
           this.lastRenderKey = "";
+          this.opts.log?.("anim hidden (walk-out complete)");
           this.opts.compositor.setOverlay(null);
           return;
         }
@@ -195,11 +199,14 @@ export class CatAnimator {
       get damagesCells() {
         return damages();
       },
+      // The rect must cover EVERYTHING draw() can paint — including the meow
+      // bubble, which sits to the LEFT of the cat (cellX-7) — or hiding the
+      // overlay leaves orphaned cells behind.
       rect: () => ({
-        x: cur.cellX - 1,
-        y: cur.cellY - (cur.showMeow ? 1 : 0),
-        w: CAT_COLS + 8,
-        h: CAT_ROWS + 1 + (cur.showMeow ? 1 : 0),
+        x: cur.cellX - 8,
+        y: cur.cellY - 1,
+        w: CAT_COLS + 10,
+        h: CAT_ROWS + 2,
       }),
       draw: (cols, rows) => {
         let s = renderer.draw({ frame: cur.frame, cellX: cur.cellX, cellY: cur.cellY, cols, rows });

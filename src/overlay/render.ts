@@ -36,12 +36,19 @@ export interface DrawOpts {
 }
 
 export class SpriteRenderer {
-  private transmitted = new Set<FrameName>();
   private b64Cache = new Map<FrameName, string>();
-  private frameIds = new Map<FrameName, number>();
-  private lastPlacedId: number | null = null;
+  // Single image id: frame changes RETRANSMIT data under the same id (the
+  // active placement keeps showing, updated in place) and position changes
+  // re-place the same placement id (atomic replace). No deletes during
+  // animation — a delete/place pair leaves a window where the terminal can
+  // composite a frame with no cat at all.
+  private lastFrame: FrameName | null = null;
+  private placed = false;
 
-  constructor(private mode: RenderMode) {}
+  constructor(
+    private mode: RenderMode,
+    private log?: (msg: string) => void,
+  ) {}
 
   get modeName(): RenderMode {
     return this.mode;
@@ -59,24 +66,16 @@ export class SpriteRenderer {
 
   /** Extra cleanup beyond cell repair (kitty must delete its placement). */
   clear(): string {
-    if (this.mode === "kitty" && this.lastPlacedId !== null) {
-      const id = this.lastPlacedId;
-      this.lastPlacedId = null;
-      return `\x1b_Ga=d,d=i,i=${id},q=2\x1b\\`;
+    if (this.mode === "kitty" && this.placed) {
+      this.placed = false;
+      this.lastFrame = null; // force a retransmit on the next show
+      this.log?.(`kitty clear i=${KITTY_IMG_BASE}`);
+      return `\x1b_Ga=d,d=i,i=${KITTY_IMG_BASE},q=2\x1b\\`;
     }
     return "";
   }
 
   // ------------------------------------------------------------- kitty ----
-  private frameId(name: FrameName): number {
-    let id = this.frameIds.get(name);
-    if (id === undefined) {
-      id = KITTY_IMG_BASE + this.frameIds.size;
-      this.frameIds.set(name, id);
-    }
-    return id;
-  }
-
   private frameB64(name: FrameName): string {
     let b64 = this.b64Cache.get(name);
     if (b64 === undefined) {
@@ -90,29 +89,23 @@ export class SpriteRenderer {
 
   private drawKitty(o: DrawOpts): string {
     const visCols = Math.min(CAT_COLS, o.cols - o.cellX);
+    this.log?.(`kitty draw f=${o.frame} x=${o.cellX} y=${o.cellY} vis=${visCols}`);
     if (visCols <= 0) return this.clear();
-    const id = this.frameId(o.frame);
     let s = "";
-    if (!this.transmitted.has(o.frame)) {
+    if (this.lastFrame !== o.frame) {
       const b64 = this.frameB64(o.frame);
       const CHUNK = 4000;
       for (let i = 0; i < b64.length; i += CHUNK) {
         const last = i + CHUNK >= b64.length;
-        const keys = i === 0 ? `a=t,f=100,t=d,i=${id},q=2,m=${last ? 0 : 1}` : `m=${last ? 0 : 1}`;
+        const keys = i === 0 ? `a=t,f=100,t=d,i=${KITTY_IMG_BASE},q=2,m=${last ? 0 : 1}` : `m=${last ? 0 : 1}`;
         s += `\x1b_G${keys};${b64.slice(i, i + CHUNK)}\x1b\\`;
       }
-      this.transmitted.add(o.frame);
-    }
-    // Re-placing the same placement id replaces it atomically — no delete, no
-    // flicker. Only an image-id switch (frame change) needs the old placement
-    // removed, immediately followed by the new one in the same write.
-    if (this.lastPlacedId !== null && this.lastPlacedId !== id) {
-      s += `\x1b_Ga=d,d=i,i=${this.lastPlacedId},q=2\x1b\\`;
+      this.lastFrame = o.frame;
     }
     const srcW = Math.round((visCols / CAT_COLS) * FRAME_W * KITTY_SCALE);
     s += `\x1b[${o.cellY + 1};${o.cellX + 1}H`;
-    s += `\x1b_Ga=p,i=${id},p=1,z=1,C=1,q=2,w=${srcW},c=${visCols},r=${CAT_ROWS}\x1b\\`;
-    this.lastPlacedId = id;
+    s += `\x1b_Ga=p,i=${KITTY_IMG_BASE},p=1,z=1,C=1,q=2,w=${srcW},c=${visCols},r=${CAT_ROWS}\x1b\\`;
+    this.placed = true;
     return s;
   }
 
@@ -151,14 +144,34 @@ export class SpriteRenderer {
   // ------------------------------------------------------------ kaomoji ----
   private drawKaomoji(o: DrawOpts): string {
     const art = o.frame === "alert" ? ["  ∧,,,∧", " (  ̳> · < ̳)", " /    づ mew!"] : ["  ∧,,,∧", " (  ̳- ᴥ - ̳)", " /    づ zzZ"];
+    const avail = o.cols - o.cellX; // clip by COLUMNS at the right edge — a
+    if (avail <= 0) return ""; //      wrapped line would paint residue at col 0
     let s = "";
     art.forEach((line, i) => {
       const row = o.cellY + CAT_ROWS - art.length + i;
       if (row < 0 || row >= o.rows) return;
-      s += `\x1b[${row + 1};${o.cellX + 1}H\x1b[0m${line}`;
+      s += `\x1b[${row + 1};${o.cellX + 1}H\x1b[0m${clipColumns(line, avail)}`;
     });
     return s;
   }
+}
+
+/** Truncate a string to fit `cols` terminal columns (wide chars count 2, combining marks 0). */
+function clipColumns(line: string, cols: number): string {
+  let used = 0;
+  let out = "";
+  for (const ch of line) {
+    const cp = ch.codePointAt(0)!;
+    const w =
+      (cp >= 0x0300 && cp <= 0x036f) ? 0 : // combining marks
+      (cp >= 0x1100 && cp <= 0x115f) || (cp >= 0x2e80 && cp <= 0x9fff) ||
+      (cp >= 0xac00 && cp <= 0xd7a3) || (cp >= 0xf900 && cp <= 0xfaff) ||
+      (cp >= 0xff00 && cp <= 0xff60) || (cp >= 0x3000 && cp <= 0x303e) ? 2 : 1;
+    if (used + w > cols) break;
+    used += w;
+    out += ch;
+  }
+  return out;
 }
 
 function pixelAt(px: Uint8Array, x: number, y: number): [number, number, number] | null {

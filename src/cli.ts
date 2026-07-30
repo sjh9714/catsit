@@ -128,10 +128,15 @@ guard.arm();
 const sm = new StateMachine();
 const detector = new ClaudeScreenDetector();
 const gate = new InputGate(() => !flags.noSwallow && !flags.noCat && sm.gateClosed);
+if (debugLog) {
+  sm.onChange((n, p) =>
+    debugLog(`state ${p.kind}${"reason" in p ? ":" + (p as { reason: string }).reason : ""} -> ${n.kind}${"reason" in n ? ":" + (n as { reason: string }).reason : ""}`),
+  );
+}
 
 let animator: CatAnimator | null = null;
 if (!flags.noCat) {
-  const renderer = new SpriteRenderer(detectRenderMode());
+  const renderer = new SpriteRenderer(detectRenderMode(), debugLog ?? undefined);
   animator = new CatAnimator({
     compositor,
     mirror: compositor.screen,
@@ -139,6 +144,7 @@ if (!flags.noCat) {
     bell: () => {
       if (!flags.quiet) process.stdout.write("\x07");
     },
+    log: debugLog ?? undefined,
   });
   sm.onChange((next) => animator!.onState(next));
   animator.start();
@@ -151,8 +157,14 @@ if (!flags.noCat) {
 const SETTLE_MS = 80;
 let lastForwardAt = 0;
 let settleTimer: NodeJS.Timeout | null = null;
+let lastScreenState = "";
 function runDetect(): void {
-  sm.updateFromScreen(detector.detect(compositor.screen));
+  const s = detector.detect(compositor.screen);
+  if (debugLog && s !== lastScreenState) {
+    debugLog(`screen ${lastScreenState || "(start)"} -> ${s}`);
+    lastScreenState = s;
+  }
+  sm.updateFromScreen(s);
 }
 function detectSoon(): void {
   lastForwardAt = Date.now();
