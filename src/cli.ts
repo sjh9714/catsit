@@ -6,7 +6,9 @@
 // error — the cat gets up, meows, and steps aside.
 
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import { Compositor } from "./compositor.js";
+import { runDemoAgent } from "./demo.js";
 import { ClaudeScreenDetector } from "./detect/screen.js";
 import { TranscriptWatcher } from "./detect/transcript.js";
 import { InputGate } from "./input.js";
@@ -25,6 +27,7 @@ done — the cat gets up, meows, and steps aside ("your turn").
 Usage:
   catsit <command> [args...]     e.g.  catsit claude
   catsit -- <command> [args...]
+  catsit --demo                  try it with a bundled fake agent (no tokens)
 
 Flags (before the command):
   --no-swallow   decorative cat only; never gates keystrokes
@@ -56,16 +59,23 @@ function parseArgs(argv: string[]): { flags: Flags; cmd: string; args: string[] 
     if (a === "--no-cat") flags.noCat = true;
     else if (a === "--no-swallow") flags.noSwallow = true;
     else if (a === "--quiet") flags.quiet = true;
-    else if (a === "-h" || a === "--help") {
+    else if (a === "--demo") {
+      // wrap ourselves running the bundled fake agent
+      return { flags, cmd: process.execPath, args: [fileURLToPath(import.meta.url), "--demo-child"] };
+    } else if (a === "-h" || a === "--help") {
       process.stdout.write(HELP);
       process.exit(0);
     } else if (a === "-v" || a === "--version") {
-      process.stdout.write("catsit 0.0.0\n");
+      process.stdout.write("catsit 0.1.0\n");
       process.exit(0);
     } else break;
   }
   if (i >= argv.length) return null;
   return { flags, cmd: argv[i]!, args: argv.slice(i + 1) };
+}
+
+if (process.argv[2] === "--demo-child") {
+  await runDemoAgent();
 }
 
 const parsed = parseArgs(process.argv.slice(2));
