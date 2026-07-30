@@ -33,6 +33,8 @@ export class Compositor {
       rows: number;
       write: (s: string) => void;
       onError?: (err: unknown) => void;
+      /** Called after each forward once the mirror reflects the new screen. */
+      onAfterForward?: () => void;
     },
   ) {
     this.mirror = new Mirror(opts.cols, opts.rows);
@@ -97,6 +99,7 @@ export class Compositor {
       this.pen.feed(appBytes);
       await this.mirror.feed(appBytes);
       this.opts.write(appBytes);
+      this.opts.onAfterForward?.();
       return;
     }
     const preState: AppState = this.mirror.captureState(this.pen);
@@ -107,6 +110,7 @@ export class Compositor {
       this.mirror.restoreSeq(this.mirror.captureState(this.pen));
     this.overlayRect = this.overlay.rect(this.mirror.cols, this.mirror.rows);
     this.opts.write(SYNC_START + pre + appBytes + post + SYNC_END);
+    this.opts.onAfterForward?.();
   }
 
   private armStaleTimer(): void {
