@@ -108,10 +108,11 @@ describe("TranscriptWatcher", () => {
   function setup(cwd = "/proj/x"): { w: TranscriptWatcher; file: string } {
     const dir = path.join(base, projectSlug(cwd));
     fs.mkdirSync(dir, { recursive: true });
+    // the watcher starts BEFORE the wrapped agent creates its session file
+    const w = new TranscriptWatcher({ cwd, baseDir: base });
+    w.onEvent((e) => events.push(e));
     const file = path.join(dir, "11111111-2222-3333-4444-555555555555.jsonl");
     fs.writeFileSync(file, "");
-    const w = new TranscriptWatcher({ cwd, baseDir: base, spawnedAt: Date.now() - 1000 });
-    w.onEvent((e) => events.push(e));
     return { w, file };
   }
 
@@ -147,19 +148,24 @@ describe("TranscriptWatcher", () => {
     expect(events).toEqual([{ type: "turn_end", durationMs: 5 }]);
   });
 
-  it("ignores files last touched before spawn", () => {
+  it("ignores pre-existing session files, even ones still being written", () => {
     const cwd = "/proj/x";
     const dir = path.join(base, projectSlug(cwd));
     fs.mkdirSync(dir, { recursive: true });
-    const stale = path.join(dir, "old.jsonl");
-    fs.writeFileSync(stale, JSON.stringify({ type: "system", subtype: "turn_duration", durationMs: 1 }) + "\n");
-    const past = (Date.now() - 60_000) / 1000;
-    fs.utimesSync(stale, past, past);
-    const w = new TranscriptWatcher({ cwd, baseDir: base, spawnedAt: Date.now() });
+    const other = path.join(dir, "other-live-session.jsonl");
+    fs.writeFileSync(other, "");
+    const w = new TranscriptWatcher({ cwd, baseDir: base });
     w.onEvent((e) => events.push(e));
+    // the other session keeps writing after we started — must not be tracked
+    fs.appendFileSync(other, JSON.stringify({ type: "system", subtype: "turn_duration", durationMs: 1 }) + "\n");
     w.pollOnce();
     w.pollOnce();
     expect(events).toEqual([]);
+    // but OUR child's new session file is picked up
+    const ours = path.join(dir, "new-session.jsonl");
+    fs.writeFileSync(ours, JSON.stringify({ type: "system", subtype: "turn_duration", durationMs: 7 }) + "\n");
+    w.pollOnce();
+    expect(events).toEqual([{ type: "turn_end", durationMs: 7 }]);
   });
 });
 

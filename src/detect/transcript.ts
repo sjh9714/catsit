@@ -16,7 +16,6 @@ export interface TranscriptWatcherOptions {
   cwd: string;
   baseDir?: string; // default ~/.claude/projects (injectable for tests)
   pollMs?: number;
-  spawnedAt?: number;
 }
 
 /** Claude Code encodes the project cwd by replacing '/', '.' and '_' with '-'. */
@@ -31,14 +30,25 @@ export class TranscriptWatcher {
   private carry = "";
   private timer: NodeJS.Timeout | null = null;
   private listeners: Array<(ev: TranscriptEvent) => void> = [];
-  private spawnedAt: number;
   private pollMs: number;
+  // Session files that already existed when we started: another Claude
+  // session may be live in the same cwd and must not be mistaken for the one
+  // we wrapped. Name-snapshotting is portable (Linux has no real birthtime).
+  private preexisting: Set<string>;
 
   constructor(opts: TranscriptWatcherOptions) {
     const base = opts.baseDir ?? path.join(os.homedir(), ".claude", "projects");
     this.dir = path.join(base, projectSlug(opts.cwd));
-    this.spawnedAt = opts.spawnedAt ?? Date.now();
     this.pollMs = opts.pollMs ?? 300;
+    this.preexisting = this.listJsonl();
+  }
+
+  private listJsonl(): Set<string> {
+    try {
+      return new Set(fs.readdirSync(this.dir).filter((e) => e.endsWith(".jsonl")));
+    } catch {
+      return new Set();
+    }
   }
 
   onEvent(cb: (ev: TranscriptEvent) => void): void {
@@ -89,26 +99,15 @@ export class TranscriptWatcher {
     }
   }
 
-  /** Newest .jsonl in the project dir touched after we spawned. */
+  /** Newest .jsonl that appeared after we started watching. */
   private findSessionFile(): string | null {
-    let entries: string[];
-    try {
-      entries = fs.readdirSync(this.dir);
-    } catch {
-      return null;
-    }
     let best: { file: string; mtime: number } | null = null;
-    for (const e of entries) {
-      if (!e.endsWith(".jsonl")) continue;
+    for (const e of this.listJsonl()) {
+      if (this.preexisting.has(e)) continue;
       const p = path.join(this.dir, e);
       try {
         const st = fs.statSync(p);
-        // Only sessions CREATED after we spawned: another Claude session may
-        // be live in the same cwd (mtime keeps moving) and must not be
-        // mistaken for the one we wrapped.
-        if (st.birthtimeMs >= this.spawnedAt - 2000 && (!best || st.mtimeMs > best.mtime)) {
-          best = { file: p, mtime: st.mtimeMs };
-        }
+        if (!best || st.mtimeMs > best.mtime) best = { file: p, mtime: st.mtimeMs };
       } catch {
         /* raced */
       }
