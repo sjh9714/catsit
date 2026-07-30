@@ -103,7 +103,10 @@ export class TranscriptWatcher {
       const p = path.join(this.dir, e);
       try {
         const st = fs.statSync(p);
-        if (st.mtimeMs >= this.spawnedAt - 2000 && (!best || st.mtimeMs > best.mtime)) {
+        // Only sessions CREATED after we spawned: another Claude session may
+        // be live in the same cwd (mtime keeps moving) and must not be
+        // mistaken for the one we wrapped.
+        if (st.birthtimeMs >= this.spawnedAt - 2000 && (!best || st.mtimeMs > best.mtime)) {
           best = { file: p, mtime: st.mtimeMs };
         }
       } catch {

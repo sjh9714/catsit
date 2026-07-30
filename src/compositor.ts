@@ -15,14 +15,22 @@ export interface Overlay {
   rect(cols: number, rows: number): Rect;
   /** Paint the overlay. May assume pen state is undefined; must not scroll. */
   draw(cols: number, rows: number): string;
+  /** Extra cleanup beyond cell repair (e.g. kitty placement deletion). */
+  clear?(): string;
+  /**
+   * False when the overlay floats above the cells without touching them
+   * (kitty graphics) — cell repair (undraw) is skipped entirely then.
+   */
+  damagesCells?: boolean;
 }
 
 export class Compositor {
   private mirror: Mirror;
   private chunker = new Chunker();
   private pen = new PenTracker();
-  private overlay: Overlay | null = null;
-  private overlayRect: Rect | null = null; // rect as last drawn
+  // rect and damages are captured AT DRAW TIME: the overlay object may mutate
+  // between draw and hide, and repair must match what was actually painted.
+  private active: { o: Overlay; rect: Rect; damages: boolean } | null = null;
   private chain: Promise<void> = Promise.resolve();
   private degraded = false;
   private staleTimer: NodeJS.Timeout | null = null;
@@ -65,16 +73,22 @@ export class Compositor {
   setOverlay(overlay: Overlay | null): void {
     if (this.degraded) return;
     this.enqueue(async () => {
-      const prev = this.overlayRect;
-      this.overlay = overlay;
+      const prev = this.active;
       const st = this.mirror.captureState(this.pen);
       let out = "";
-      if (prev) out += this.mirror.undrawRect(prev);
+      if (prev) {
+        if (prev.o !== overlay) out += prev.o.clear?.() ?? "";
+        if (prev.damages) out += this.mirror.undrawRect(prev.rect);
+      }
       if (overlay) {
         out += overlay.draw(this.mirror.cols, this.mirror.rows);
-        this.overlayRect = overlay.rect(this.mirror.cols, this.mirror.rows);
+        this.active = {
+          o: overlay,
+          rect: overlay.rect(this.mirror.cols, this.mirror.rows),
+          damages: overlay.damagesCells !== false,
+        };
       } else {
-        this.overlayRect = null;
+        this.active = null;
       }
       if (out) this.opts.write(SYNC_START + out + this.mirror.restoreSeq(st) + SYNC_END);
     });
@@ -84,7 +98,9 @@ export class Compositor {
     this.enqueue(async () => {
       // Old overlay cells cannot be repaired after reflow; drop the overlay
       // and let the caller re-show it after the app repaints.
-      this.overlayRect = null;
+      const out = this.active?.o.clear?.() ?? "";
+      if (out) this.opts.write(out);
+      this.active = null;
       this.mirror.resize(cols, rows);
     });
   }
@@ -95,20 +111,28 @@ export class Compositor {
   }
 
   private async forward(appBytes: string): Promise<void> {
-    if (!this.overlayRect || !this.overlay) {
+    if (!this.active) {
       this.pen.feed(appBytes);
       await this.mirror.feed(appBytes);
       this.opts.write(appBytes);
       this.opts.onAfterForward?.();
       return;
     }
-    const preState: AppState = this.mirror.captureState(this.pen);
-    const pre = this.mirror.undrawRect(this.overlayRect) + this.mirror.restoreSeq(preState);
+    let pre = "";
+    if (this.active.damages) {
+      const preState: AppState = this.mirror.captureState(this.pen);
+      pre = this.mirror.undrawRect(this.active.rect) + this.mirror.restoreSeq(preState);
+    }
     this.pen.feed(appBytes);
     await this.mirror.feed(appBytes);
-    const post = this.overlay.draw(this.mirror.cols, this.mirror.rows) +
+    const o = this.active.o;
+    const post = o.draw(this.mirror.cols, this.mirror.rows) +
       this.mirror.restoreSeq(this.mirror.captureState(this.pen));
-    this.overlayRect = this.overlay.rect(this.mirror.cols, this.mirror.rows);
+    this.active = {
+      o,
+      rect: o.rect(this.mirror.cols, this.mirror.rows),
+      damages: o.damagesCells !== false,
+    };
     this.opts.write(SYNC_START + pre + appBytes + post + SYNC_END);
     this.opts.onAfterForward?.();
   }

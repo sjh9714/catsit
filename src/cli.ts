@@ -1,26 +1,41 @@
 #!/usr/bin/env node
 // catsit — a cat that babysits your AI agent so you don't have to.
 //
-// v0 wiring: PTY passthrough with the compositor in place. The cat overlay,
-// state detection, and input gating land in later phases; CATSIT_BOX=1 shows
-// a dev overlay box for manual testing.
+// While the agent works, a cat sits on your terminal and swallows your
+// typing. The moment you're needed — permission prompt, question, done,
+// error — the cat gets up, meows, and steps aside.
 
-import { Compositor, type Overlay } from "./compositor.js";
+import fs from "node:fs";
+import { Compositor } from "./compositor.js";
+import { ClaudeScreenDetector } from "./detect/screen.js";
+import { TranscriptWatcher } from "./detect/transcript.js";
+import { InputGate } from "./input.js";
+import { CatAnimator } from "./overlay/cat.js";
+import { detectRenderMode, SpriteRenderer } from "./overlay/render.js";
 import { spawnChild } from "./pty.js";
 import { TerminalGuard } from "./restore.js";
+import { StateMachine } from "./state.js";
 
 const HELP = `catsit — a cat that babysits your AI agent so you don't have to.
 
+While the agent works, the cat sits on your terminal and swallows your
+typing ("not yet"). The moment you're needed — permission prompt, question,
+done — the cat gets up, meows, and steps aside ("your turn").
+
 Usage:
-  catsit <command> [args...]     wrap a command (e.g. catsit claude)
+  catsit <command> [args...]     e.g.  catsit claude
   catsit -- <command> [args...]
 
 Flags (before the command):
-  --no-cat       disable the overlay entirely
-  --no-swallow   cat is decorative only; never gates keystrokes
+  --no-swallow   decorative cat only; never gates keystrokes
+  --no-cat       no overlay at all (plain transparent wrapper)
   --quiet        no bell when the cat gets up
   -h, --help     show this help
   -v, --version  show version
+
+Keys while the cat is sitting:
+  ctrl+g         shoo the cat away for the rest of the session
+  ctrl+c / esc   always pass through instantly — the cat never blocks these
 `;
 
 interface Flags {
@@ -58,25 +73,99 @@ if (!parsed) {
   process.stdout.write(HELP);
   process.exit(2);
 }
+const { flags, cmd, args } = parsed;
 
 const cols = process.stdout.columns || 80;
 const rows = process.stdout.rows || 24;
 
+const debugLog = process.env["CATSIT_DEBUG"]
+  ? (msg: string) => {
+      try {
+        fs.appendFileSync(process.env["CATSIT_DEBUG"]!, `${new Date().toISOString()} ${msg}\n`);
+      } catch {
+        /* ignore */
+      }
+    }
+  : null;
+
+const teePath = process.env["CATSIT_DEBUG_TEE"];
 const compositor = new Compositor({
   cols,
   rows,
-  write: (s) => process.stdout.write(s),
+  write: (s) => {
+    if (teePath) {
+      try {
+        fs.appendFileSync(teePath, s, "latin1");
+      } catch {
+        /* ignore */
+      }
+    }
+    process.stdout.write(s);
+  },
+  onError: (err) => {
+    debugLog?.(`COMPOSITOR DEGRADED: ${err instanceof Error ? err.stack : String(err)}`);
+  },
+  onAfterForward: () => detectSoon(),
 });
 
 const guard = new TerminalGuard((s) => process.stdout.write(s), {
   onAltScreen: () => compositor.screen.onAltScreen(),
 });
+
+const child = spawnChild(cmd, args, cols, rows);
 guard.arm();
 
-const child = spawnChild(parsed.cmd, parsed.args, cols, rows);
+const sm = new StateMachine();
+const detector = new ClaudeScreenDetector();
+const gate = new InputGate(() => !flags.noSwallow && !flags.noCat && sm.gateClosed);
+
+let animator: CatAnimator | null = null;
+if (!flags.noCat) {
+  const renderer = new SpriteRenderer(detectRenderMode());
+  animator = new CatAnimator({
+    compositor,
+    mirror: compositor.screen,
+    renderer,
+    bell: () => {
+      if (!flags.quiet) process.stdout.write("\x07");
+    },
+  });
+  sm.onChange((next) => animator!.onState(next));
+  animator.start();
+}
+
+// Screen detection runs only on SETTLED screens: a redraw burst can leave
+// half-drawn frames in the mirror, and detecting on those oscillates the
+// state. After each forward we wait for an 80ms quiet window; a slow tick
+// advances the idle debounce when the app goes fully quiet.
+const SETTLE_MS = 80;
+let lastForwardAt = 0;
+let settleTimer: NodeJS.Timeout | null = null;
+function runDetect(): void {
+  sm.updateFromScreen(detector.detect(compositor.screen));
+}
+function detectSoon(): void {
+  lastForwardAt = Date.now();
+  if (settleTimer) clearTimeout(settleTimer);
+  settleTimer = setTimeout(runDetect, SETTLE_MS);
+  settleTimer.unref?.();
+}
+const idleTick = setInterval(() => {
+  if (Date.now() - lastForwardAt < SETTLE_MS) return;
+  runDetect();
+}, 400);
+idleTick.unref?.();
+
+// transcript tail (zero-config; silently inert for non-claude commands)
+const transcript = new TranscriptWatcher({ cwd: process.cwd() });
+transcript.onEvent((ev) => sm.updateFromTranscript(ev));
+transcript.start();
 
 child.onData((d) => compositor.feed(Buffer.from(d, "utf8")));
 child.onExit((code) => {
+  sm.onChildExit(code);
+  transcript.stop();
+  animator?.stop();
   void compositor.flush().then(() => {
     guard.restore(false);
     compositor.dispose();
@@ -84,9 +173,14 @@ child.onExit((code) => {
   });
 });
 
-// stdin: raw passthrough for now (gating lands with the state machine)
 if (process.stdin.isTTY) process.stdin.setRawMode(true);
-process.stdin.on("data", (d: Buffer) => child.write(d.toString("utf8")));
+process.stdin.on("data", (d: Buffer) => {
+  const r = gate.process(d);
+  if (r.pass) child.write(r.pass);
+  if (r.shooRequested) sm.shoo();
+  if (r.pasteSwallowed) animator?.onPaste();
+  else if (r.swallowed > 0) animator?.onSwallow();
+});
 process.stdin.resume();
 
 process.stdout.on("resize", () => {
@@ -95,22 +189,3 @@ process.stdout.on("resize", () => {
   child.resize(c, r);
   compositor.resize(c, r);
 });
-
-// dev overlay box for manual verification until the cat lands
-if (process.env.CATSIT_BOX === "1" && !parsed.flags.noCat) {
-  const box: Overlay = {
-    rect: (c, r) => ({ x: c - 24, y: r - 9, w: 22, h: 7 }),
-    draw: (c, r) => {
-      let s = "";
-      for (let i = 0; i < 7; i++) {
-        s += `\x1b[${r - 9 + i + 1};${c - 24 + 1}H\x1b[0;48;2;255;140;0;38;2;40;20;0m${" CATSIT DEV BOX ".padEnd(22).slice(0, 22)}`;
-      }
-      return s + "\x1b[0m";
-    },
-  };
-  let on = false;
-  setInterval(() => {
-    on = !on;
-    compositor.setOverlay(on ? box : null);
-  }, 2000).unref();
-}

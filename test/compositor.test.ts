@@ -149,6 +149,27 @@ describe("Compositor", () => {
     expect(user.buffer.active.getLine(user.buffer.active.viewportY + 1)?.translateToString(true)).toBe("after crash");
   });
 
+  it("repairs cells even if damagesCells flips to false before hiding", async () => {
+    // regression: a mutable overlay (cat + meow bubble) may report
+    // damagesCells=false at hide time although it painted cells at draw time
+    let damages = true;
+    const moody: Overlay = {
+      get damagesCells() {
+        return damages;
+      },
+      rect: () => ({ x: 10, y: 3, w: 8, h: 2 }),
+      draw: () => `\x1b[4;11H\x1b[0;48;5;208m BUBBLE \x1b[0m`,
+      clear: () => "",
+    };
+    for (let i = 0; i < 8; i++) await feed(`line ${i} abcdefghijklmnop\r\n`);
+    comp.setOverlay(moody);
+    await pump();
+    damages = false; // state machine moved on before the hide
+    comp.setOverlay(null);
+    await pump();
+    expectEqual(); // bubble must be gone
+  });
+
   it("overlay animation frames (replace overlay while visible) leave no trail", async () => {
     const at = (x: number): Overlay => ({
       rect: () => ({ x, y: 2, w: 6, h: 3 }),
