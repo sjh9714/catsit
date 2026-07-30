@@ -1,0 +1,54 @@
+{
+  "name": "catsit",
+  "version": "0.0.0",
+  "description": "A cat that babysits your AI agent so you don't have to. While Claude works, the cat sits on your terminal; when you're needed, the cat gets up.",
+  "keywords": [
+    "claude-code",
+    "coding-agent",
+    "cat",
+    "terminal",
+    "pty",
+    "cli"
+  ],
+  "license": "MIT",
+  "author": "JinHyuk Sung",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sjh9714/catsit.git"
+  },
+  "homepage": "https://github.com/sjh9714/catsit",
+  "type": "module",
+  "bin": {
+    "catsit": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "README.ko.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "node --experimental-strip-types src/cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "dependencies": {
+    "@lydell/node-pty": "^1.1.0",
+    "@xterm/headless": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
