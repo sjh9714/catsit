@@ -7,9 +7,9 @@
 Claude가 일하는 동안 고양이가 터미널 위에 앉아 당신의 타이핑을 삼킵니다.<br>
 당신이 필요해지는 순간 — 권한 요청, 질문, 완료 — 고양이가 벌떡 일어나 야옹하고 비켜줍니다.
 
-<img src="docs/assets/demo.gif" alt="catsit 데모: Claude Code가 일하는 동안 픽셀 턱시도 고양이가 터미널에 식빵 자세로 앉아 있다가, 권한 프롬프트가 뜨면 일어나서 야옹한다" width="720">
+<img src="docs/assets/demo.gif" alt="catsit 데모: 진짜 흰 아기 고양이가 터미널로 걸어 들어와 Claude Code가 일하는 동안 앉아 기다리다, 권한 프롬프트가 뜨면 벌떡 일어서서 야옹하고 걸어 나간다" width="720">
 
-<sub>데모는 <code>--guard</code> 모드입니다. 기본값에서는 입력을 절대 건드리지 않습니다.</sub>
+<sub>실제 영상입니다 — 스프라이트가 아니라 한 마리의 연속 연기. 기본값에서는 입력을 절대 건드리지 않으며 <code>--guard</code>는 옵트인입니다.</sub>
 
 [English](README.md) · [日本語](README.ja.md) · [简体中文](README.zh-CN.md)
 
@@ -70,7 +70,7 @@ catsit은 알림을 뒤집습니다. 고양이의 **존재 자체**가 신호입
 
 | 터미널 | 렌더링 |
 |---|---|
-| kitty, Ghostty, WezTerm, iTerm2 3.6+, Konsole | 텍스트 **위에 떠 있는** 진짜 PNG 고양이 (kitty 그래픽 프로토콜, 알파 투명) |
+| kitty, Ghostty, WezTerm, iTerm2 3.6+, Konsole | 텍스트 **위에 떠 있는** 진짜 아기 고양이 — 걸어 들어와 앉고, 기다리고, 벌떡 일어나 야옹하고, 걸어 나가는 연속 촬영 연기 (kitty 그래픽 프로토콜) |
 | 그 외 (tmux, VS Code, Terminal.app 포함) | 트루컬러 반블록 픽셀 고양이 |
 | `NO_COLOR` / dumb 터미널 | 소박한 카오모지 `(=˘ω˘=)` |
 
@@ -118,5 +118,8 @@ catsit --demo             내장 가짜 에이전트로 체험 (guard 켜짐)
 [Cat Gatekeeper](https://github.com/zokuzoku/cat-gatekeeper)(둠스크롤을 막는
 거대 고양이)에서 영감을 받았습니다. catsit은 독립 프로젝트입니다 —
 다른 고양이, 다른 문제: *에이전트*를 *당신으로부터* 지킵니다.
+
+고양이는 AI 생성 연속 연기(Kling)를 비트 단위로 이어붙인 것입니다 —
+[assets/cat-frames/CREDITS.md](assets/cat-frames/CREDITS.md) 참고.
 
 MIT © 성진혁

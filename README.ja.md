@@ -7,9 +7,9 @@
 Claude が作業している間、猫がターミナルの上に座り、あなたのタイピングを飲み込みます。<br>
 あなたの出番になった瞬間 — 権限確認、質問、完了 — 猫は立ち上がり、鳴いて、道を譲ります。
 
-<img src="docs/assets/demo.gif" alt="catsit デモ: Claude Code の作業中、ピクセルのハチワレ猫がターミナルで香箱座りし、権限プロンプトが出ると立ち上がって鳴く" width="720">
+<img src="docs/assets/demo.gif" alt="catsit デモ: 本物の白い子猫がターミナルに歩いて入り、Claude Code の作業中は座って待ち、権限プロンプトが出ると立ち上がって鳴き、歩き去る" width="720">
 
-<sub>デモは <code>--guard</code> モードです。デフォルトでは入力に一切触れません。</sub>
+<sub>実写映像です — スプライトではなく一匹の連続した演技。デフォルトでは入力に一切触れず、<code>--guard</code> はオプトインです。</sub>
 
 [English](README.md) · [한국어](README.ko.md) · [简体中文](README.zh-CN.md)
 
@@ -70,7 +70,7 @@ catsit は通知を反転させます。猫の**存在そのもの**がシグナ
 
 | ターミナル | 表示 |
 |---|---|
-| kitty, Ghostty, WezTerm, iTerm2 3.6+, Konsole | テキストの**上に浮かぶ**本物の PNG 猫（kitty graphics protocol、アルファ付き） |
+| kitty, Ghostty, WezTerm, iTerm2 3.6+, Konsole | テキストの**上に浮かぶ**本物の子猫 — 歩いて入り、座って待ち、立ち上がって鳴き、歩き去る連続撮影の演技（kitty graphics protocol） |
 | その他（tmux, VS Code, Terminal.app 含む） | トゥルーカラー半ブロックのピクセル猫 |
 | `NO_COLOR` / dumb 端末 | つつましい顔文字 `(=˘ω˘=)` |
 
@@ -104,5 +104,8 @@ catsit --demo                同梱のフェイクエージェントで体験（
 [Cat Gatekeeper](https://github.com/zokuzoku/cat-gatekeeper)（ドゥームスクロール
 を阻止する巨大猫）に着想を得ました。catsit は独立プロジェクトです —
 別の猫、別の問題：*エージェント*を*あなたから*守ります。
+
+子猫は AI 生成の連続演技（Kling）をビート単位でつないだものです —
+[assets/cat-frames/CREDITS.md](assets/cat-frames/CREDITS.md) 参照。
 
 MIT © JinHyuk Sung

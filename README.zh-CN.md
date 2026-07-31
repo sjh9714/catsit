@@ -7,9 +7,9 @@
 Claude 工作时，一只猫会坐在你的终端上，吞掉你的键盘输入。<br>
 需要你的那一刻 —— 权限确认、提问、完成 —— 猫会起身喵一声，让开位置。
 
-<img src="docs/assets/demo.gif" alt="catsit 演示：Claude Code 工作时，一只像素奶牛猫在终端上团成面包坐姿；权限提示出现时它起身喵叫" width="720">
+<img src="docs/assets/demo.gif" alt="catsit 演示：一只真实的白色小猫走进终端，在 Claude Code 工作时坐着等待；权限提示出现时它直立起身喵叫，然后走开" width="720">
 
-<sub>演示为 <code>--guard</code> 模式。默认情况下 catsit 绝不碰你的输入。</sub>
+<sub>这是真实影像 —— 同一只猫的连续表演，而非精灵图。默认情况下 catsit 绝不碰你的输入，<code>--guard</code> 为可选项。</sub>
 
 [English](README.md) · [한국어](README.ko.md) · [日本語](README.ja.md)
 
@@ -67,7 +67,7 @@ catsit 把通知反转过来。猫的**存在本身**就是信号：
 
 | 终端 | 效果 |
 |---|---|
-| kitty、Ghostty、WezTerm、iTerm2 3.6+、Konsole | 真正的 PNG 猫**悬浮在文字上方**（kitty 图形协议，带透明通道） |
+| kitty、Ghostty、WezTerm、iTerm2 3.6+、Konsole | 一只真实小猫**悬浮在文字上方** —— 走进来、坐下、等待、直立喵叫、走开，全程连续表演（kitty 图形协议） |
 | 其他（含 tmux、VS Code、Terminal.app） | 真彩色半块像素猫 |
 | `NO_COLOR` / dumb 终端 | 朴素的颜文字 `(=˘ω˘=)` |
 
@@ -101,5 +101,8 @@ catsit --demo             用内置假智能体体验（guard 开启）
 [Cat Gatekeeper](https://github.com/zokuzoku/cat-gatekeeper)（阻止你刷手机的
 巨猫）。catsit 是独立项目 —— 不同的猫，不同的问题：它保护的是*智能体*，
 防的是*你*。
+
+小猫本身是 AI 生成的连续表演（Kling），按节拍无缝拼接 ——
+参见 [assets/cat-frames/CREDITS.md](assets/cat-frames/CREDITS.md)。
 
 MIT © JinHyuk Sung

@@ -7,9 +7,9 @@
 While Claude works, a cat sits on your terminal and swallows your typing.<br>
 The moment you're needed — permission prompt, question, done — the cat gets up, meows, and steps aside.
 
-<img src="docs/assets/demo.gif" alt="catsit demo: a pixel tuxedo cat loafs on the terminal while Claude Code works, then gets up and meows when a permission prompt appears" width="720">
+<img src="docs/assets/demo.gif" alt="catsit demo: a real white kitten walks onto the terminal, sits while Claude Code works, then rears up in a meow when a permission prompt appears and walks off" width="720">
 
-<sub>The demo shows <code>--guard</code> mode. By default, catsit never touches your input.</sub>
+<sub>Real footage — one continuous take, not a sprite sheet. By default catsit never touches your input; <code>--guard</code> is opt-in.</sub>
 
 [한국어](README.ko.md) · [日本語](README.ja.md) · [简体中文](README.zh-CN.md)
 
@@ -73,7 +73,7 @@ Want the cat to actually stop you from micromanaging? `catsit --guard claude`:
 
 | Terminal | You get |
 |---|---|
-| kitty, Ghostty, WezTerm, iTerm2 3.6+, Konsole | a real PNG cat floating **above** the text (kitty graphics protocol, alpha and all) |
+| kitty, Ghostty, WezTerm, iTerm2 3.6+, Konsole | a real kitten — one continuous filmed performance floating **above** the text (kitty graphics protocol): it walks in, sits down, waits, rears up in a meow, and walks off |
 | everything else (incl. tmux, VS Code, Terminal.app) | a truecolor pixel cat drawn in half-blocks |
 | `NO_COLOR` / dumb terminals | a humble kaomoji `(=˘ω˘=)` |
 
@@ -127,5 +127,8 @@ The "cute thing physically intervenes" mechanic was inspired by
 [Cat Gatekeeper](https://github.com/zokuzoku/cat-gatekeeper) by ZOKUZOKU —
 a giant cat that blocks your doomscrolling. catsit is an independent project;
 different cat, different problem: it guards the *agent*, from *you*.
+
+The kitten itself is an AI-generated continuous performance (Kling), cut into
+seamlessly chained beats — see [assets/cat-frames/CREDITS.md](assets/cat-frames/CREDITS.md).
 
 MIT © JinHyuk Sung
