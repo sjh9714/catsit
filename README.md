@@ -4,12 +4,12 @@
 
 **A cat that babysits your AI agent, so you don't have to.**
 
-While Claude works, a cat sits on your terminal and swallows your typing.<br>
-The moment you're needed — permission prompt, question, done — the cat gets up, meows, and steps aside.
+While Claude works, a real kitten sits on your terminal and keeps watch.<br>
+The moment you're needed — permission prompt, question, done — it rears up, meows, and steps aside.
 
 <img src="docs/assets/demo.gif" alt="catsit demo: a real white kitten walks onto the terminal, sits while Claude Code works, then rears up in a meow when a permission prompt appears and walks off" width="720">
 
-<sub>Real footage — one continuous take, not a sprite sheet. By default catsit never touches your input; <code>--guard</code> is opt-in.</sub>
+<sub>One kitten, one continuous take — not a sprite sheet (see the FAQ for how it was made). By default catsit never touches your input; <code>--guard</code> is opt-in.</sub>
 
 [한국어](README.ko.md) · [日本語](README.ja.md) · [简体中文](README.zh-CN.md)
 
@@ -56,10 +56,10 @@ catsit inverts the notification. The cat's **presence** is the signal:
 
 | The cat... | means |
 |---|---|
-| 🐈 walks in and loafs | the agent is working. You're not needed. Go do something else. |
-| 😑 flicks its tail and eats your keystroke | *"not yet."* |
-| 😴 falls asleep | it's been a long task. Still handled. |
-| ❗ jumps up, meows, steps aside | permission prompt / question / finished — **your turn.** |
+| 🐈 walks in and sits down | the agent is working. You're not needed. Go do something else. |
+| 😴 curls up asleep | you've been away a while. Still handled. |
+| 🥱 wakes up with a yawn | you touched a key — it noticed, that's all. |
+| ❗ rears up, meows, steps aside | permission prompt / question / finished — **your turn.** |
 
 If you can see the cat, you can ignore the terminal. That's the deal.
 
@@ -76,7 +76,7 @@ Want the cat to actually stop you from micromanaging? `catsit --guard claude`:
 - While the agent works, the cat swallows printable typing and Enter — and
   **shows what it ate** in a little bubble (`🐟 hell…`), so a blocked key
   never looks like a bug. The first catch comes with a hint:
-  `cat is guarding · ctrl+g to shoo`.
+  `guarding · ctrl+g to shoo`.
 - `ctrl+c`, `ctrl+d`, `esc`, arrows, every control key — **always pass
   through instantly**, even in guard mode.
 - The moment a permission prompt is detected, the gate opens **before** any
@@ -90,7 +90,7 @@ Want the cat to actually stop you from micromanaging? `catsit --guard claude`:
 
 | Terminal | You get |
 |---|---|
-| kitty, Ghostty, WezTerm, iTerm2 3.6+, Konsole | a real kitten — one continuous filmed performance floating **above** the text (kitty graphics protocol): it walks in, sits down, waits, rears up in a meow, and walks off |
+| kitty, Ghostty, WezTerm, iTerm2 3.6+ | a real kitten — one continuous filmed performance floating **above** the text (kitty graphics protocol): it walks in, sits down, waits, rears up in a meow, and walks off |
 | everything else (incl. tmux, VS Code, Terminal.app) | the same living kitten in chunky truecolor half-blocks — lo-fi, but it still walks, naps, and meows |
 | `NO_COLOR` / dumb terminals | a humble kaomoji `(=˘ω˘=)` |
 
@@ -123,6 +123,12 @@ catsit --demo                bundled fake agent, for trying it out (guard on)
 ```
 
 ## FAQ
+
+**Is that a real cat?** It's one continuous AI-generated performance
+(Kling) of one kitten on a green screen that doesn't exist — every state was
+generated with its first frame pinned to the previous state's last frame, so
+it never cuts, teleports, or slides. Details in
+[assets/cat-frames/CREDITS.md](assets/cat-frames/CREDITS.md).
 
 **Why "catsit"?** The cat sits on your terminal, and it cat-sits your agent.
 
