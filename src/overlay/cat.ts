@@ -10,6 +10,8 @@ import type { FrameName } from "./sprites.js";
 
 type Anim =
   | { kind: "hidden" }
+  | { kind: "waiting"; since: number } // agent is working, but too recently —
+  //   short turns come and go without the cat ever appearing (or meowing)
   | { kind: "walk-in"; step: number }
   | { kind: "loaf"; since: number }
   | { kind: "flick"; until: number }
@@ -23,6 +25,7 @@ const SLEEP_AFTER_MS = 90_000;
 const MEOW_HOLD_MS = 1400;
 export const BUBBLE_HOLD_MS = 1400;
 export const HINT_HOLD_MS = 4000;
+export const APPEAR_DELAY_MS = 3500;
 
 export class CatAnimator {
   private anim: Anim = { kind: "hidden" };
@@ -58,12 +61,19 @@ export class CatAnimator {
     this.opts.log?.(`anim<-state ${next.kind}${"reason" in next ? ":" + next.reason : ""} (anim=${this.anim.kind})`);
     switch (next.kind) {
       case "working":
-        if (this.anim.kind === "hidden" || this.anim.kind === "walk-out") {
-          this.anim = { kind: "walk-in", step: this.anim.kind === "walk-out" ? WALK_STEPS - this.anim.step : 0 };
+        if (this.anim.kind === "hidden") {
+          this.anim = { kind: "waiting", since: this.now() };
+        } else if (this.anim.kind === "walk-out") {
+          // the cat was just here — come straight back, no delay
+          this.anim = { kind: "walk-in", step: WALK_STEPS - this.anim.step };
         }
         break;
       case "needs_human":
-        if (this.anim.kind !== "hidden") {
+        if (this.anim.kind === "waiting") {
+          // the turn ended before the cat ever appeared: stay silent — the
+          // user was never told to look away, so no meow is owed
+          this.anim = { kind: "hidden" };
+        } else if (this.anim.kind !== "hidden") {
           this.anim = { kind: "alert", until: this.now() + MEOW_HOLD_MS };
           this.opts.bell();
           this.render(); // the gate is already open; this is just the show
@@ -71,11 +81,17 @@ export class CatAnimator {
         break;
       case "shooed":
       case "unknown":
-        if (this.anim.kind !== "hidden" && this.anim.kind !== "walk-out") {
+        if (this.anim.kind === "waiting") this.anim = { kind: "hidden" };
+        else if (this.anim.kind !== "hidden" && this.anim.kind !== "walk-out") {
           this.anim = { kind: "walk-out", step: 0 };
         }
         break;
     }
+  }
+
+  /** In guard mode, keys are only gated while the cat is actually on screen. */
+  get isVisible(): boolean {
+    return this.anim.kind !== "hidden" && this.anim.kind !== "waiting";
   }
 
   // feedback bubble state (guard mode): what the cat just ate, plus a
@@ -127,6 +143,10 @@ export class CatAnimator {
     switch (this.anim.kind) {
       case "hidden":
         return;
+      case "waiting":
+        if (t - this.anim.since >= APPEAR_DELAY_MS) this.anim = { kind: "walk-in", step: 0 };
+        else return;
+        break;
       case "walk-in":
         this.anim.step++;
         if (this.anim.step >= WALK_STEPS) this.anim = { kind: "loaf", since: t };
@@ -242,10 +262,10 @@ export class CatAnimator {
         const bubbleRow = Math.max(1, cur.cellY); // 1-based CUP row = 0-based cellY-1
         const bx = Math.max(0, cur.cellX - 8);
         if (cur.showMeow) {
-          s += `\x1b[${bubbleRow};${bx + 2}H\x1b[0;1;38;2;255;220;120m mew! \x1b[0m`;
+          s += `\x1b[${bubbleRow};${bx + 2}H\x1b[0;1;${renderer.fg(255, 220, 120)}m mew! \x1b[0m`;
         } else if (cur.bubble !== null) {
           // what the cat just ate (guard mode)
-          s += `\x1b[${bubbleRow};${bx + 1}H\x1b[0;38;2;30;30;30;48;2;255;220;120m 🐟 ${clipColumns(cur.bubble, 8)} \x1b[0m`;
+          s += `\x1b[${bubbleRow};${bx + 1}H\x1b[0;${renderer.fg(30, 30, 30)};${renderer.bg(255, 220, 120)}m 🐟 ${clipColumns(cur.bubble, 8)} \x1b[0m`;
         }
         if (cur.hint) {
           const hintRow = cur.cellY + CAT_ROWS + 1; // 1-based; last row of the rect
@@ -261,7 +281,7 @@ export class CatAnimator {
   }
 
   private render(): void {
-    if (this.anim.kind === "hidden") return;
+    if (this.anim.kind === "hidden" || this.anim.kind === "waiting") return;
     const t = this.now();
     this.cur.frame = this.frameFor(t);
     this.cur.cellX = this.xOffset(this.opts.mirror.cols);

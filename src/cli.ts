@@ -16,7 +16,7 @@ import { TranscriptWatcher } from "./detect/transcript.js";
 import { InputGate } from "./input.js";
 import { CatAnimator } from "./overlay/cat.js";
 import { detectRenderMode, SpriteRenderer } from "./overlay/render.js";
-import { spawnChild } from "./pty.js";
+import { spawnChild, type Child } from "./pty.js";
 import { TerminalGuard } from "./restore.js";
 import { StateMachine } from "./state.js";
 
@@ -73,7 +73,7 @@ if (parsed.kind === "help") {
   process.exit(process.argv.length > 2 ? 0 : 2);
 }
 if (parsed.kind === "version") {
-  process.stdout.write("catsit 0.2.0\n");
+  process.stdout.write("catsit 0.2.1\n");
   process.exit(0);
 }
 if (parsed.kind === "error") {
@@ -93,6 +93,7 @@ if (!resolved) {
   process.stderr.write(`catsit: command not found: ${cmd}\n`);
   process.exit(127);
 }
+
 
 const cols = process.stdout.columns || 80;
 const rows = process.stdout.rows || 24;
@@ -131,12 +132,25 @@ const guard = new TerminalGuard((s) => process.stdout.write(s), {
   onAltScreen: () => compositor.screen.onAltScreen(),
 });
 
-const child = spawnChild(resolved, args, cols, rows);
+let child: Child;
+try {
+  child = await spawnChild(resolved, args, cols, rows);
+} catch (err) {
+  process.stderr.write(
+    "catsit: could not load the terminal driver (@lydell/node-pty).\n" +
+      "No native prebuild for this platform — on Alpine/musl try:\n" +
+      "  npm_config_build_from_source=1 npx catsit ...\n" +
+      `(${err instanceof Error ? err.message : String(err)})\n`,
+  );
+  process.exit(1);
+}
 guard.arm();
 
 const sm = new StateMachine();
 const detector = new ClaudeScreenDetector();
-const gate = new InputGate(() => flags.guard && !flags.noCat && sm.gateClosed);
+// Guard only gates while the cat is actually on screen: during the appear
+// delay (short turns) nothing is ever swallowed invisibly.
+const gate = new InputGate(() => flags.guard && !flags.noCat && sm.gateClosed && (animator?.isVisible ?? false));
 if (debugLog) {
   sm.onChange((n, p) =>
     debugLog(`state ${p.kind}${"reason" in p ? ":" + (p as { reason: string }).reason : ""} -> ${n.kind}${"reason" in n ? ":" + (n as { reason: string }).reason : ""}`),

@@ -27,6 +27,33 @@ export function detectRenderMode(env: NodeJS.ProcessEnv = process.env): RenderMo
   return "half";
 }
 
+/** Terminals without 24-bit color (notably Apple Terminal) get xterm-256. */
+export function detectTruecolor(env: NodeJS.ProcessEnv = process.env): boolean {
+  const override = env["CATSIT_COLOR"];
+  if (override === "truecolor") return true;
+  if (override === "256") return false;
+  if (/truecolor|24bit/i.test(env["COLORTERM"] ?? "")) return true;
+  if ((env["TERM"] ?? "").includes("direct")) return true;
+  if (env["TERM"] === "xterm-kitty" || env["KITTY_WINDOW_ID"]) return true;
+  const prog = env["TERM_PROGRAM"] ?? "";
+  if (/ghostty|wezterm|iterm\.app|vscode|orca/i.test(prog)) return true;
+  return false; // unknown terminal: 256-color is safe everywhere
+}
+
+/** Nearest xterm-256 index: 6×6×6 color cube + the grayscale ramp. */
+export function rgbTo256(r: number, g: number, b: number): number {
+  const cube = (v: number): number => (v < 48 ? 0 : v < 115 ? 1 : Math.min(5, Math.floor((v - 35) / 40)));
+  const cr = cube(r);
+  const cg = cube(g);
+  const cb = cube(b);
+  const cv = (i: number): number => (i === 0 ? 0 : 55 + i * 40);
+  const cubeDist = (cv(cr) - r) ** 2 + (cv(cg) - g) ** 2 + (cv(cb) - b) ** 2;
+  const grayIdx = Math.max(0, Math.min(23, Math.round(((r + g + b) / 3 - 8) / 10)));
+  const gv = 8 + grayIdx * 10;
+  const grayDist = (gv - r) ** 2 + (gv - g) ** 2 + (gv - b) ** 2;
+  return grayDist < cubeDist ? 232 + grayIdx : 16 + 36 * cr + 6 * cg + cb;
+}
+
 export interface DrawOpts {
   frame: FrameName;
   cellX: number; // may be > cols-CAT_COLS during walk-in (clipped)
@@ -48,10 +75,21 @@ export class SpriteRenderer {
   constructor(
     private mode: RenderMode,
     private log?: (msg: string) => void,
+    private truecolor: boolean = detectTruecolor(),
   ) {}
 
   get modeName(): RenderMode {
     return this.mode;
+  }
+
+  /** SGR foreground params for an RGB color, honoring the color depth. */
+  fg(r: number, g: number, b: number): string {
+    return this.truecolor ? `38;2;${r};${g};${b}` : `38;5;${rgbTo256(r, g, b)}`;
+  }
+
+  /** SGR background params for an RGB color, honoring the color depth. */
+  bg(r: number, g: number, b: number): string {
+    return this.truecolor ? `48;2;${r};${g};${b}` : `48;5;${rgbTo256(r, g, b)}`;
   }
 
   get cellSize(): { w: number; h: number } {
@@ -132,9 +170,9 @@ export class SpriteRenderer {
           continue;
         }
         if (runStart === -1) runStart = cx;
-        if (top && bot) run += `\x1b[38;2;${top[0]};${top[1]};${top[2]};48;2;${bot[0]};${bot[1]};${bot[2]}m▀`;
-        else if (top) run += `\x1b[0;38;2;${top[0]};${top[1]};${top[2]}m▀`;
-        else run += `\x1b[0;38;2;${bot![0]};${bot![1]};${bot![2]}m▄`;
+        if (top && bot) run += `\x1b[${this.fg(top[0], top[1], top[2])};${this.bg(bot[0], bot[1], bot[2])}m▀`;
+        else if (top) run += `\x1b[0;${this.fg(top[0], top[1], top[2])}m▀`;
+        else run += `\x1b[0;${this.fg(bot![0], bot![1], bot![2])}m▄`;
       }
       flush();
     }

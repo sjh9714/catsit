@@ -5,7 +5,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Compositor } from "../src/compositor.js";
-import { CatAnimator } from "../src/overlay/cat.js";
+import { APPEAR_DELAY_MS, CatAnimator } from "../src/overlay/cat.js";
 import { SpriteRenderer, type RenderMode } from "../src/overlay/render.js";
 import { diffScreens, makeUserTerm, writeTo } from "./helpers.js";
 import type { Terminal as XtermTerminal } from "@xterm/headless";
@@ -55,8 +55,9 @@ async function runLifecycle(mode: RenderMode): Promise<void> {
     await feed(`\x1b[3${i % 8}mrow ${i} abcdefghijklmnopqrstuvwxyz0123456789\x1b[0m\r\n`);
   }
 
-  // working: cat walks in and loafs
+  // working: after the appear delay the cat walks in and loafs
   animator.onState({ kind: "working" });
+  now += APPEAR_DELAY_MS;
   for (let i = 0; i < 12; i++) {
     now += 200;
     animator.tick();
@@ -98,6 +99,48 @@ async function runLifecycle(mode: RenderMode): Promise<void> {
   animator.stop();
   await pump();
 }
+
+describe("CatAnimator appear delay", () => {
+  it("short turns come and go without the cat appearing or meowing", async () => {
+    let bells = 0;
+    const animator = new CatAnimator({
+      compositor: comp,
+      mirror: comp.screen,
+      renderer: new SpriteRenderer("half"),
+      bell: () => bells++,
+      now: () => now,
+    });
+    await feed("some app content\r\n");
+    animator.onState({ kind: "working" });
+    // turn ends 2s later — before the appear delay elapses
+    now += 2000;
+    animator.tick();
+    await pump();
+    animator.onState({ kind: "needs_human", reason: "done" });
+    await pump();
+    expect(bells).toBe(0);
+    expect(animator.isVisible).toBe(false);
+    expect(diffScreens(comp.screen, user)).toEqual([]); // nothing was ever drawn
+    animator.stop();
+  });
+
+  it("guard visibility follows the cat, not the state", async () => {
+    const animator = new CatAnimator({
+      compositor: comp,
+      mirror: comp.screen,
+      renderer: new SpriteRenderer("half"),
+      bell: () => {},
+      now: () => now,
+    });
+    animator.onState({ kind: "working" });
+    expect(animator.isVisible).toBe(false); // waiting: no cat -> no gating
+    now += APPEAR_DELAY_MS;
+    animator.tick();
+    await pump();
+    expect(animator.isVisible).toBe(true);
+    animator.stop();
+  });
+});
 
 describe("CatAnimator leaves zero residue", () => {
   it("half-block mode: full lifecycle then screen is exactly the app's", async () => {

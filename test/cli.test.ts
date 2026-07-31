@@ -30,10 +30,10 @@ describe.skipIf(!fs.existsSync(DIST))("cli (built)", () => {
     expect(r.stderr).toContain("--");
   });
 
-  it("--version prints 0.2.0", async () => {
+  it("--version prints the current version", async () => {
     const r = await run(["--version"]);
     expect(r.code).toBe(0);
-    expect(r.stdout.trim()).toBe("catsit 0.2.0");
+    expect(r.stdout.trim()).toBe("catsit 0.2.1");
   });
 
   it("wraps a command transparently and propagates the exit code", async () => {
