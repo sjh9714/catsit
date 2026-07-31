@@ -33,6 +33,15 @@ export const APPEAR_DELAY_MS = Number(process.env["CATSIT_APPEAR_MS"]) || 1200;
 // no user activity this long → curls up (env override eases manual testing)
 export const SLEEP_AFTER_MS = Number(process.env["CATSIT_SLEEP_MS"]) || 60_000;
 const MEOW_HOLD_TICKS = 14; // bubble rides the alertUp beat this long
+// sitDown's last ~14 frames are the cat already seated (settling micro-
+// motion). Played backwards for the stand-up, they would be dead air right
+// when "done" should feel immediate — so the stand-up enters past them.
+// Still 1× playback: no frames are sped up, only still ones skipped.
+const STAND_UP_TICKS = 14;
+// walkOut's reared opening is skipped when entering from a stand-up: frame 9
+// is the all-fours stance that best matches sitDown's first frame (pixel-
+// diff verified), so the turn-and-leave connects without a jump.
+const WALKOUT_TURN_TICKS = 8;
 
 // what plays after a one-shot beat finishes
 const NEXT_BEAT: Partial<Record<BeatName, BeatName>> = {
@@ -40,8 +49,8 @@ const NEXT_BEAT: Partial<Record<BeatName, BeatName>> = {
   sitDown: "idle",
   sleepDown: "sleepLoop",
   wakeUp: "alertUp", // overridden to walkOut when the cat was shooed awake
-  // alertUp has no default: the rear-up ends in a HELD standing watch, and
-  // tick() decides between holding, settling back, and the goodbye walk-off
+  // alertUp has no default: tick() routes it — the meow gesture continues
+  // down through walkOut's opening into sitDown, or straight off on "done"
 };
 
 // fallback-tier pose for each beat (pixel cat has no filmed transitions)
@@ -149,7 +158,7 @@ export class CatAnimator {
             this.pendingAlert = true;
           } else if (wantExit) {
             // finished while loafing: no crying — stand up and walk off
-            this.anim = { kind: "beat", beat: "sitDown", ticks: 0, reverse: true };
+            this.anim = { kind: "beat", beat: "sitDown", ticks: STAND_UP_TICKS, reverse: true };
           } else {
             this.anim = { kind: "beat", beat: "alertUp", ticks: 0 };
             this.meow();
@@ -167,7 +176,7 @@ export class CatAnimator {
             else if (a.beat === "sleepDown") this.pendingWake = true;
           } else if (a.beat === "idle") {
             // from loafing: stand up first, then the walk-off — connected
-            this.anim = { kind: "beat", beat: "sitDown", ticks: 0, reverse: true };
+            this.anim = { kind: "beat", beat: "sitDown", ticks: STAND_UP_TICKS, reverse: true };
           } else {
             this.anim = { kind: "beat", beat: "walkOut", ticks: 0 };
           }
@@ -278,7 +287,7 @@ export class CatAnimator {
         } else if (this.anim.beat === "idle" && nowDone) {
           // catch-all: however we ended up loafing with the task finished,
           // stand up and walk off — never leave the cat sitting over "done"
-          this.anim = { kind: "beat", beat: "sitDown", ticks: 0, reverse: true };
+          this.anim = { kind: "beat", beat: "sitDown", ticks: STAND_UP_TICKS, reverse: true };
         } else if (
           this.anim.beat === "idle" &&
           this.lastState.kind === "working" && // never doze off while YOU are needed
@@ -301,12 +310,12 @@ export class CatAnimator {
               // leaving from the sitting anchor: stand up first, connected
               next = "sitDown";
               reverse = true;
+              startTicks = STAND_UP_TICKS;
             }
           } else if (this.anim.beat === "sitDown" && this.anim.reverse) {
-            // stood up — turn and walk off, skipping walkOut's reared opening
-            // (frame ~9 is the same all-fours stance the stand-up ends on)
+            // stood up — turn and walk off
             next = "walkOut";
-            startTicks = 8;
+            startTicks = WALKOUT_TURN_TICKS;
           } else if (this.anim.beat === "sitDown" && this.pendingAlert) next = "alertUp";
           else if (this.anim.beat === "alertUp") {
             // the meow is ONE gesture: rear up, cry, come right back down —
