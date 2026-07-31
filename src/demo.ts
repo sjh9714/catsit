@@ -62,12 +62,12 @@ async function idle(seconds: number, note: string): Promise<void> {
 export async function runDemoAgent(): Promise<never> {
   for (;;) {
     await idle(2, "\x1b[2midle — the cat only guards while the agent works\x1b[0m");
-    await busy(20, "refactoring src/auth.ts — guard mode: try typing, the cat swallows it");
+    await busy(18, "refactoring src/auth.ts — guard mode: try typing, the cat swallows it");
     // long enough for the whole meow gesture: wake, rear up, cry, sit back —
     // the "yes" lands right as the cat settles
-    await permission(13);
+    await permission(16);
     await busy(6, "running the tests you approved");
     // long enough for the cat's full goodbye: stand up, walk off
-    await idle(12, "⏺ Done! All tests pass.");
+    await idle(14, "⏺ Done! All tests pass.");
   }
 }

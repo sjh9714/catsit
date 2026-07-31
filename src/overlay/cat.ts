@@ -18,10 +18,11 @@ type Anim =
   | { kind: "hidden" }
   | { kind: "waiting"; since: number } // agent is working, but too recently —
   //   short turns come and go without the cat ever appearing (or meowing)
-  | { kind: "beat"; beat: BeatName; ticks: number; reverse?: boolean; brisk?: boolean };
-// reverse: the beat's footage played backwards — the rear-down half of the
-// meow gesture, and the stand-up before a walk-off (both land on anchors).
-// brisk: wakeUp without the yawn, for waking into an alert or an exit.
+  | { kind: "beat"; beat: BeatName; ticks: number; reverse?: boolean; bridge?: boolean };
+// reverse: sitDown played backwards — the calm stand-up before a walk-off.
+// bridge: walkOut's opening used as the rear-DOWN of the meow gesture — the
+// cat comes off its hind legs (frames 0–9, forward footage, mouth closed)
+// and hands over to sitDown at the matching all-fours frame.
 
 const TICK_MS = 100;
 export const BUBBLE_HOLD_MS = 1400;
@@ -133,12 +134,9 @@ export class CatAnimator {
         } else if (a.kind === "beat") {
           this.opts.bell(); // the gate is already open; the bell never waits
           const wantExit = next.reason === "done";
-          if (a.beat === "alertUp") {
-            // mid rear-down: finish settling; tick() then routes by reason
-            if (!wantExit) this.pendingAlert = true;
-          } else if (a.beat === "sleepLoop") {
+          if (a.beat === "sleepLoop") {
             this.wakeTarget = wantExit ? "walkOut" : "alertUp";
-            this.anim = { kind: "beat", beat: "wakeUp", ticks: 0, brisk: true };
+            this.anim = { kind: "beat", beat: "wakeUp", ticks: 0 };
           } else if (a.beat === "sleepDown") {
             this.wakeTarget = wantExit ? "walkOut" : "alertUp";
             this.pendingWake = true; // finish curling, then wake into it
@@ -165,7 +163,7 @@ export class CatAnimator {
         else if (a.kind === "beat" && !exiting) {
           if (a.beat === "sleepLoop" || a.beat === "sleepDown" || a.beat === "wakeUp") {
             this.wakeTarget = "walkOut";
-            if (a.beat === "sleepLoop") this.anim = { kind: "beat", beat: "wakeUp", ticks: 0, brisk: true };
+            if (a.beat === "sleepLoop") this.anim = { kind: "beat", beat: "wakeUp", ticks: 0 };
             else if (a.beat === "sleepDown") this.pendingWake = true;
           } else if (a.beat === "idle") {
             // from loafing: stand up first, then the walk-off — connected
@@ -272,7 +270,16 @@ export class CatAnimator {
       case "beat": {
         this.anim.ticks++;
         if (this.meowUntilTick > 0) this.meowUntilTick--;
-        if (
+        const nowDone = this.lastState.kind === "needs_human" && this.lastState.reason === "done";
+        if (this.anim.beat === "walkOut" && this.anim.bridge && this.anim.ticks >= 9) {
+          // the rear-down bridge reached the all-fours frame — hand over to
+          // sitDown (forward footage) and settle beside the user
+          this.anim = { kind: "beat", beat: "sitDown", ticks: 0 };
+        } else if (this.anim.beat === "idle" && nowDone) {
+          // catch-all: however we ended up loafing with the task finished,
+          // stand up and walk off — never leave the cat sitting over "done"
+          this.anim = { kind: "beat", beat: "sitDown", ticks: 0, reverse: true };
+        } else if (
           this.anim.beat === "idle" &&
           this.lastState.kind === "working" && // never doze off while YOU are needed
           this.anim.ticks >= (this.opts.settleTicks ?? 50) && // settle in before napping
@@ -281,11 +288,12 @@ export class CatAnimator {
           this.pendingWake = false;
           this.wakeTarget = "idle";
           this.anim = { kind: "beat", beat: "sleepDown", ticks: 0 };
-        } else if (this.opts.renderer.beatDone(this.anim.beat, this.anim.ticks, this.anim.reverse, this.anim.brisk)) {
+        } else if (this.opts.renderer.beatDone(this.anim.beat, this.anim.ticks, this.anim.reverse)) {
           let next = NEXT_BEAT[this.anim.beat];
           let reverse = false;
+          let bridge = false;
           let startTicks = 0;
-          const taskDone = this.lastState.kind === "needs_human" && this.lastState.reason === "done";
+          const taskDone = nowDone;
           if (this.anim.beat === "sleepDown") next = this.pendingWake ? "wakeUp" : "sleepLoop";
           else if (this.anim.beat === "wakeUp") {
             next = this.wakeTarget;
@@ -300,22 +308,14 @@ export class CatAnimator {
             next = "walkOut";
             startTicks = 8;
           } else if (this.anim.beat === "sitDown" && this.pendingAlert) next = "alertUp";
-          else if (this.anim.beat === "alertUp" && this.anim.reverse) {
-            if (taskDone) {
-              // it finished while the cat was settling: stand up, walk off
-              next = "sitDown";
-              reverse = true;
-            } else next = this.pendingAlert ? "alertUp" : "idle";
-          } else if (this.anim.beat === "alertUp") {
+          else if (this.anim.beat === "alertUp") {
             // the meow is ONE gesture: rear up, cry, come right back down —
             // answered or not (the bell and the cry already did the telling).
-            // Only a task that finished mid-cry walks straight off from the
-            // reared frame instead of settling.
-            if (taskDone) next = "walkOut";
-            else {
-              next = "alertUp";
-              reverse = true;
-            }
+            // The way down is all forward footage: walkOut's opening brings
+            // the cat off its hind legs, then sitDown seats it. Only a task
+            // that finished mid-cry walks straight off instead.
+            next = "walkOut";
+            if (!taskDone) bridge = true;
           }
           if (next) {
             this.pendingWake = false;
@@ -330,7 +330,7 @@ export class CatAnimator {
               beat: next,
               ticks: startTicks,
               ...(reverse ? { reverse: true } : {}),
-              ...(next === "wakeUp" && this.wakeTarget !== "idle" ? { brisk: true } : {}),
+              ...(bridge ? { bridge: true } : {}),
             };
           } else if (this.anim.beat === "walkOut") {
             // if the agent went back to work while the cat was busy leaving
@@ -375,7 +375,6 @@ export class CatAnimator {
     beat: "idle" as BeatName,
     beatTicks: 0,
     reverse: false,
-    brisk: false,
     cellX: 0,
     cellY: 0,
     showMeow: false,
@@ -410,7 +409,6 @@ export class CatAnimator {
           beat: cur.beat,
           beatTicks: cur.beatTicks,
           reverse: cur.reverse,
-          brisk: cur.brisk,
           // read LIVE, not from cur: the compositor calls draw() on every app
           // forward, and a held pose must retransmit right after an erase
           clearEpoch: mirror.clearEpoch,
@@ -457,7 +455,6 @@ export class CatAnimator {
     this.cur.beat = beat;
     this.cur.beatTicks = ticks;
     this.cur.reverse = this.anim.reverse ?? false;
-    this.cur.brisk = this.anim.brisk ?? false;
     this.cur.frame = FALLBACK_FRAME[beat](ticks);
     this.cur.cellX = Math.max(0, this.opts.mirror.cols - this.opts.renderer.catCols - 1);
     this.cur.cellY = this.yAnchor(this.opts.mirror.rows);
@@ -468,7 +465,7 @@ export class CatAnimator {
     this.cur.hintText = this.hintText;
     const frameIdx =
       this.opts.renderer.modeName === "kitty"
-        ? this.opts.renderer.beatFrame(beat, ticks, this.cur.reverse, this.cur.brisk)
+        ? this.opts.renderer.beatFrame(beat, ticks, this.cur.reverse)
         : this.cur.frame;
     const key = `${beat}|${frameIdx}|${this.cur.cellX}|${this.cur.cellY}|${this.cur.showMeow}|${this.cur.bubble ?? ""}|${this.cur.hint}`;
     if (key === this.lastRenderKey) return; // nothing changed; forwards keep it drawn

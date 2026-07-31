@@ -208,9 +208,9 @@ describe("CatAnimator appear delay", () => {
     await tickN(41 + 50); // finish walkIn + sitDown
     expect(beat().beat).toBe("alertUp"); // then the rear-up plays
     await tickN(51); // a prompt is a call, not a goodbye: cry, then sit back
-    expect(beat().beat).toBe("alertUp");
-    expect((beat() as { reverse?: boolean }).reverse).toBe(true);
-    await tickN(40);
+    expect(beat().beat).toBe("walkOut");
+    expect((beat() as { bridge?: boolean }).bridge).toBe(true);
+    await tickN(10 + 51); // bridge → sitDown → seated
     expect(beat().beat).toBe("idle"); // seated again, yours to answer
     animator.stop();
   });
@@ -240,11 +240,14 @@ describe("CatAnimator appear delay", () => {
     expect(beat().beat).toBe("alertUp");
     animator.onState({ kind: "working" }); // you hit "yes" — agent resumes
     await tickN(41); // the rear-up finishes...
-    expect(beat().beat).toBe("alertUp"); // ...and comes right back down
-    expect(beat().reverse).toBe(true);
+    expect(beat().beat).toBe("walkOut"); // ...and comes off its hind legs
+    expect((beat() as { bridge?: boolean }).bridge).toBe(true); // (not leaving)
     expect(animator.isVisible).toBe(true); // never leaves the screen
-    await tickN(40); // rear-down (meow frames skipped) lands on the anchor
-    expect(beat().beat).toBe("idle");
+    await tickN(10); // the bridge hands over at the all-fours frame
+    expect(beat().beat).toBe("sitDown");
+    expect(beat().reverse).toBeFalsy(); // forward footage: sitting down
+    await tickN(51);
+    expect(beat().beat).toBe("idle"); // seated beside you again
     animator.stop();
   });
 
@@ -303,9 +306,9 @@ describe("CatAnimator appear delay", () => {
     animator.onState({ kind: "needs_human", reason: "question" });
     expect(beat().beat).toBe("alertUp"); // reason flicker: same prompt, no re-alert
     await tickN(51); // rear-up meow plays out with no answer…
-    expect(beat().beat).toBe("alertUp");
-    expect(beat().reverse).toBe(true); // …and settles right back down anyway
-    await tickN(40);
+    expect(beat().beat).toBe("walkOut"); // …and comes back down anyway
+    expect((beat() as { bridge?: boolean }).bridge).toBe(true);
+    await tickN(10 + 51); // bridge → sitDown → seated
     expect(beat().beat).toBe("idle"); // sitting beside you, prompt still up
     now += SLEEP_AFTER_MS + 60_000;
     await tickN(60);
