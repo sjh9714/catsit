@@ -15,6 +15,23 @@ The moment you're needed — permission prompt, question, done — the cat gets 
 
 </div>
 
+## The cat's day
+
+One continuous performance, one kitten — every transition connects.
+
+<table>
+<tr>
+<td align="center" width="33%"><b>agent starts working</b><br><sub>walks in, settles down</sub><br><img src="docs/assets/states/arrive.gif" width="240"></td>
+<td align="center" width="33%"><b>still working</b><br><sub>sits and waits — if the cat is calm, you're not needed</sub><br><img src="docs/assets/states/idle.gif" width="240"></td>
+<td align="center" width="33%"><b>60s without your input</b><br><sub>curls up for a nap</sub><br><img src="docs/assets/states/sleep.gif" width="240"></td>
+</tr>
+<tr>
+<td align="center"><b>you touch a key</b><br><sub>wakes up the slow way: yawn, stretch, sit</sub><br><img src="docs/assets/states/wake.gif" width="240"></td>
+<td align="center"><b>you're needed</b><br><sub>rears up with a meow (+ terminal bell)</sub><br><img src="docs/assets/states/alert.gif" width="240"></td>
+<td align="center"><b>steps aside</b><br><sub>walks off — an empty screen means it's your turn</sub><br><img src="docs/assets/states/leave.gif" width="240"></td>
+</tr>
+</table>
+
 ## Try it in 10 seconds (no agent, no tokens)
 
 ```
@@ -68,23 +85,6 @@ Want the cat to actually stop you from micromanaging? `catsit --guard claude`:
   breaks, it permanently degrades to a transparent passthrough — the cat
   dies, your session doesn't.
 - `ctrl+g` shoos the cat away for the rest of the session.
-
-## The cat's day
-
-One continuous performance, one kitten — every transition connects.
-
-<table>
-<tr>
-<td align="center" width="33%"><b>agent starts working</b><br><sub>walks in, settles down</sub><br><img src="docs/assets/states/arrive.gif" width="250"></td>
-<td align="center" width="33%"><b>still working</b><br><sub>sits and waits — if the cat is calm, you're not needed</sub><br><img src="docs/assets/states/idle.gif" width="250"></td>
-<td align="center" width="33%"><b>60s without your input</b><br><sub>curls up for a nap</sub><br><img src="docs/assets/states/sleep.gif" width="250"></td>
-</tr>
-<tr>
-<td align="center"><b>you touch a key</b><br><sub>wakes up the slow way: yawn, stretch, sit</sub><br><img src="docs/assets/states/wake.gif" width="250"></td>
-<td align="center"><b>you're needed</b><br><sub>rears up with a meow (+ terminal bell)</sub><br><img src="docs/assets/states/alert.gif" width="250"></td>
-<td align="center"><b>steps aside</b><br><sub>walks off — an empty screen means it's your turn</sub><br><img src="docs/assets/states/leave.gif" width="250"></td>
-</tr>
-</table>
 
 ## How it looks where you are
 

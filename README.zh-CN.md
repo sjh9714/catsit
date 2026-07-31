@@ -15,6 +15,23 @@ Claude 工作时，一只猫会坐在你的终端上，吞掉你的键盘输入�
 
 </div>
 
+## 猫的一天
+
+同一只猫的连续表演 —— 每个转场都无缝衔接。
+
+<table>
+<tr>
+<td align="center" width="33%"><b>智能体开始工作</b><br><sub>走进来，安顿下来</sub><br><img src="docs/assets/states/arrive.gif" width="240"></td>
+<td align="center" width="33%"><b>工作中</b><br><sub>坐着等待 —— 猫安静说明不需要你</sub><br><img src="docs/assets/states/idle.gif" width="240"></td>
+<td align="center" width="33%"><b>60 秒无输入</b><br><sub>蜷成一团打盹</sub><br><img src="docs/assets/states/sleep.gif" width="240"></td>
+</tr>
+<tr>
+<td align="center"><b>你碰了键盘</b><br><sub>慢悠悠醒来：打哈欠、伸懒腰、坐好</sub><br><img src="docs/assets/states/wake.gif" width="240"></td>
+<td align="center"><b>需要你了</b><br><sub>直立起身喵叫（+ 终端铃声）</sub><br><img src="docs/assets/states/alert.gif" width="240"></td>
+<td align="center"><b>让开位置</b><br><sub>走出画面 —— 屏幕空了就轮到你</sub><br><img src="docs/assets/states/leave.gif" width="240"></td>
+</tr>
+</table>
+
 ## 10 秒试用（无需智能体，不耗 token）
 
 ```
@@ -62,23 +79,6 @@ catsit 把通知反转过来。猫的**存在本身**就是信号：
 - 状态未知时闸门保持打开。内部出任何问题都会永久降级为透明直通 ——
   猫没了，会话还在。
 - `ctrl+g` 把猫赶走（本次会话内）。
-
-## 猫的一天
-
-同一只猫的连续表演 —— 每个转场都无缝衔接。
-
-<table>
-<tr>
-<td align="center" width="33%"><b>智能体开始工作</b><br><sub>走进来，安顿下来</sub><br><img src="docs/assets/states/arrive.gif" width="250"></td>
-<td align="center" width="33%"><b>工作中</b><br><sub>坐着等待 —— 猫安静说明不需要你</sub><br><img src="docs/assets/states/idle.gif" width="250"></td>
-<td align="center" width="33%"><b>60 秒无输入</b><br><sub>蜷成一团打盹</sub><br><img src="docs/assets/states/sleep.gif" width="250"></td>
-</tr>
-<tr>
-<td align="center"><b>你碰了键盘</b><br><sub>慢悠悠醒来：打哈欠、伸懒腰、坐好</sub><br><img src="docs/assets/states/wake.gif" width="250"></td>
-<td align="center"><b>需要你了</b><br><sub>直立起身喵叫（+ 终端铃声）</sub><br><img src="docs/assets/states/alert.gif" width="250"></td>
-<td align="center"><b>让开位置</b><br><sub>走出画面 —— 屏幕空了就轮到你</sub><br><img src="docs/assets/states/leave.gif" width="250"></td>
-</tr>
-</table>
 
 ## 各终端下的效果
 

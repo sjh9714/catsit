@@ -15,6 +15,23 @@ Claude가 일하는 동안 고양이가 터미널 위에 앉아 당신의 타이
 
 </div>
 
+## 고양이의 하루
+
+한 마리의 연속 연기 — 모든 전환이 이어집니다.
+
+<table>
+<tr>
+<td align="center" width="33%"><b>에이전트가 일을 시작하면</b><br><sub>걸어 들어와 자리를 잡습니다</sub><br><img src="docs/assets/states/arrive.gif" width="240"></td>
+<td align="center" width="33%"><b>작업 중</b><br><sub>앉아서 기다립니다 — 고양이가 평온하면 당신은 필요 없다는 뜻</sub><br><img src="docs/assets/states/idle.gif" width="240"></td>
+<td align="center" width="33%"><b>60초간 입력이 없으면</b><br><sub>웅크리고 낮잠을 잡니다</sub><br><img src="docs/assets/states/sleep.gif" width="240"></td>
+</tr>
+<tr>
+<td align="center"><b>키를 건드리면</b><br><sub>부스스 일어납니다: 하품, 기지개, 다시 앉기</sub><br><img src="docs/assets/states/wake.gif" width="240"></td>
+<td align="center"><b>당신이 필요해지면</b><br><sub>벌떡 일어서서 야옹 (+ 터미널 벨)</sub><br><img src="docs/assets/states/alert.gif" width="240"></td>
+<td align="center"><b>비켜줍니다</b><br><sub>걸어 나감 — 화면이 비면 당신 차례</sub><br><img src="docs/assets/states/leave.gif" width="240"></td>
+</tr>
+</table>
+
 ## 10초 체험 (에이전트·토큰 불필요)
 
 ```
@@ -65,23 +82,6 @@ catsit은 알림을 뒤집습니다. 고양이의 **존재 자체**가 신호입
 - 상태를 모르면 게이트는 열려 있습니다. 내부에서 뭔가 깨지면 투명한
   패스스루로 영구 강등됩니다 — 고양이만 죽고 세션은 삽니다.
 - `ctrl+g`로 고양이를 쫓아낼 수 있습니다(세션 동안).
-
-## 고양이의 하루
-
-한 마리의 연속 연기 — 모든 전환이 이어집니다.
-
-<table>
-<tr>
-<td align="center" width="33%"><b>에이전트가 일을 시작하면</b><br><sub>걸어 들어와 자리를 잡습니다</sub><br><img src="docs/assets/states/arrive.gif" width="250"></td>
-<td align="center" width="33%"><b>작업 중</b><br><sub>앉아서 기다립니다 — 고양이가 평온하면 당신은 필요 없다는 뜻</sub><br><img src="docs/assets/states/idle.gif" width="250"></td>
-<td align="center" width="33%"><b>60초간 입력이 없으면</b><br><sub>웅크리고 낮잠을 잡니다</sub><br><img src="docs/assets/states/sleep.gif" width="250"></td>
-</tr>
-<tr>
-<td align="center"><b>키를 건드리면</b><br><sub>부스스 일어납니다: 하품, 기지개, 다시 앉기</sub><br><img src="docs/assets/states/wake.gif" width="250"></td>
-<td align="center"><b>당신이 필요해지면</b><br><sub>벌떡 일어서서 야옹 (+ 터미널 벨)</sub><br><img src="docs/assets/states/alert.gif" width="250"></td>
-<td align="center"><b>비켜줍니다</b><br><sub>걸어 나감 — 화면이 비면 당신 차례</sub><br><img src="docs/assets/states/leave.gif" width="250"></td>
-</tr>
-</table>
 
 ## 터미널별 모습
 
