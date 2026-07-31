@@ -341,6 +341,36 @@ describe("CatAnimator appear delay", () => {
   });
 });
 
+describe("kitty graphics survive screen erases", () => {
+  it("a full-screen erase forces a retransmit, not just a re-place", async () => {
+    const animator = new CatAnimator({
+      compositor: comp,
+      mirror: comp.screen,
+      renderer: new SpriteRenderer("kitty"),
+      bell: () => {},
+      now: () => now,
+    });
+    await feed("some app content\r\n");
+    animator.onState({ kind: "working" });
+    now += APPEAR_DELAY_MS;
+    for (let i = 0; i < 102; i++) {
+      now += 200;
+      animator.tick();
+      await pump();
+    }
+    // the app clears the whole screen while the cat's frame is unchanged —
+    // kitty drops the image on ED, so the very same forward must carry a
+    // fresh transmission (a=t), not only a placement (a=p)
+    comp.feed(Buffer.from("\x1b[2J", "utf8"));
+    await comp.flush();
+    const out = written.join("");
+    expect(out).toContain("\x1b[2J");
+    expect(out).toContain("a=t,f=100");
+    await pump();
+    animator.stop();
+  });
+});
+
 describe("CatAnimator leaves zero residue", () => {
   it("half-block mode: full lifecycle then screen is exactly the app's", async () => {
     await runLifecycle("half");

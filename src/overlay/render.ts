@@ -69,6 +69,7 @@ export interface DrawOpts {
   beat: BeatName; // performance beat for the kitty tier
   beatTicks: number; // 100ms ticks since the beat started
   reverse?: boolean; // play the beat's footage backwards (rear-down)
+  clearEpoch?: number; // mirror's screen-erase counter — a bump forces retransmit
   cellX: number;
   cellY: number;
   cols: number;
@@ -82,6 +83,7 @@ export class SpriteRenderer {
   // animation — a delete/place pair leaves a window where the terminal can
   // composite a frame with no cat at all.
   private lastVKey: string | null = null;
+  private lastClearEpoch = 0;
   private placed = false;
   private frames: VideoFrames | null = null;
   private half: HalfFrames | null = null;
@@ -236,6 +238,13 @@ export class SpriteRenderer {
     const cols = this.catCols;
     const visCols = Math.min(cols, o.cols - o.cellX);
     if (visCols <= 0) return this.clear();
+    // a screen erase (ED/RIS/alt-screen) makes kitty drop the image, and a
+    // held pose never changes vkey on its own — retransmit or the cat stays
+    // invisible until the next beat
+    if (o.clearEpoch !== undefined && o.clearEpoch !== this.lastClearEpoch) {
+      this.lastClearEpoch = o.clearEpoch;
+      this.lastVKey = "";
+    }
     // the beat tick indexes frames deterministically, so app-repaint redraws
     // between animator ticks replay the SAME frame (no fast-forward)
     const idx = this.beatFrame(o.beat, o.beatTicks, o.reverse);

@@ -357,6 +357,7 @@ export class CatAnimator {
   private ensureOverlay(): Overlay {
     if (this.overlayObj) return this.overlayObj;
     const renderer = this.opts.renderer;
+    const mirror = this.opts.mirror;
     const cur = this.cur;
     const damages = () => renderer.modeName !== "kitty" || cur.showMeow || cur.bubble !== null || cur.hint;
     this.overlayObj = {
@@ -377,6 +378,9 @@ export class CatAnimator {
           beat: cur.beat,
           beatTicks: cur.beatTicks,
           reverse: cur.reverse,
+          // read LIVE, not from cur: the compositor calls draw() on every app
+          // forward, and a held pose must retransmit right after an erase
+          clearEpoch: mirror.clearEpoch,
           cellX: cur.cellX,
           cellY: cur.cellY,
           cols,

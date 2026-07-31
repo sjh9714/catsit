@@ -65,7 +65,16 @@ export class Mirror {
     return this.term.rows;
   }
 
+  /**
+   * Bumped whenever the app erases the display (ED/RIS) or flips screens.
+   * Terminals that store graphics (kitty) drop placements on these erases,
+   * so the renderer must retransmit — a re-place of a cached image id is
+   * not enough after a clear.
+   */
+  clearEpoch = 0;
+
   feed(data: string): Promise<void> {
+    if (/\x1b\[[0-3]?J|\x1bc/.test(data)) this.clearEpoch++;
     return new Promise((res) => this.term.write(data, res));
   }
 
@@ -79,6 +88,7 @@ export class Mirror {
   }
 
   onAltScreen(): boolean {
+    this.clearEpoch++;
     return this.term.buffer.active.type === "alternate";
   }
 
