@@ -68,6 +68,7 @@ export interface DrawOpts {
   frame: FrameName; // pose for the pixel-art fallback tiers
   beat: BeatName; // performance beat for the kitty tier
   beatTicks: number; // 100ms ticks since the beat started
+  reverse?: boolean; // play the beat's footage backwards (rear-down)
   cellX: number;
   cellY: number;
   cols: number;
@@ -202,10 +203,11 @@ export class SpriteRenderer {
    * Beat frame index for an animator tick count (ticks are 100ms). One-shot
    * beats clamp on their last frame; loops wrap.
    */
-  beatFrame(beat: BeatName, ticks: number): number {
+  beatFrame(beat: BeatName, ticks: number, reverse = false): number {
     const b = this.timing![beat];
-    const idx = Math.floor((ticks * b.fps) / 10);
-    return b.loop ? idx % b.count : Math.min(idx, b.count - 1);
+    const raw = Math.floor((ticks * b.fps) / 10);
+    const idx = b.loop ? raw % b.count : Math.min(raw, b.count - 1);
+    return reverse ? b.count - 1 - idx : idx;
   }
 
   /** True when a one-shot beat has played through at `ticks` animator ticks. */
@@ -236,7 +238,7 @@ export class SpriteRenderer {
     if (visCols <= 0) return this.clear();
     // the beat tick indexes frames deterministically, so app-repaint redraws
     // between animator ticks replay the SAME frame (no fast-forward)
-    const idx = this.beatFrame(o.beat, o.beatTicks);
+    const idx = this.beatFrame(o.beat, o.beatTicks, o.reverse);
     const vkey = `${o.beat}:${idx}`;
     this.log?.(`kitty draw ${vkey} x=${o.cellX} y=${o.cellY} vis=${visCols}`);
     let s = "";
@@ -265,7 +267,7 @@ export class SpriteRenderer {
     const rows = this.catRows;
     const visCols = Math.min(cols, o.cols - o.cellX);
     if (visCols <= 0) return "";
-    const idx = hf.beats[o.beat].offset + this.beatFrame(o.beat, o.beatTicks);
+    const idx = hf.beats[o.beat].offset + this.beatFrame(o.beat, o.beatTicks, o.reverse);
     const base = idx * hf.w * hf.h * 4;
     const sample = (cx: number, py: number): [number, number, number] | null => {
       const sx = Math.min(hf.w - 1, Math.floor(((cx + 0.5) * hf.w) / cols));

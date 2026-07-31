@@ -211,7 +211,40 @@ describe("CatAnimator appear delay", () => {
     animator.stop();
   });
 
-  it("comes back after you approve: walkOut into working ends in waiting, not gone", async () => {
+  it("answered before the meow ends: rears back down in place, no exit", async () => {
+    const animator = new CatAnimator({
+      compositor: comp,
+      mirror: comp.screen,
+      renderer: new SpriteRenderer("half"),
+      bell: () => {},
+      now: () => now,
+    });
+    const beat = () => (animator as unknown as { anim: { kind: string; beat?: string; reverse?: boolean } }).anim;
+    const tickN = async (n: number) => {
+      for (let i = 0; i < n; i++) {
+        now += 200;
+        animator.tick();
+        await pump();
+      }
+    };
+    await feed("some app content\r\n");
+    animator.onState({ kind: "working" });
+    now += APPEAR_DELAY_MS;
+    await tickN(102); // seated
+    animator.onState({ kind: "needs_human", reason: "permission" });
+    await tickN(10); // mid rear-up
+    expect(beat().beat).toBe("alertUp");
+    animator.onState({ kind: "working" }); // you hit "yes" — agent resumes
+    await tickN(41); // the rear-up finishes...
+    expect(beat().beat).toBe("alertUp"); // ...and plays again backwards
+    expect(beat().reverse).toBe(true);
+    expect(animator.isVisible).toBe(true); // never leaves the screen
+    await tickN(51); // rear-down lands on the sitting anchor
+    expect(beat().beat).toBe("idle");
+    animator.stop();
+  });
+
+  it("comes back after a late answer: walkOut into working ends in waiting, not gone", async () => {
     const animator = new CatAnimator({
       compositor: comp,
       mirror: comp.screen,
@@ -232,10 +265,10 @@ describe("CatAnimator appear delay", () => {
     now += APPEAR_DELAY_MS;
     await tickN(102); // seated
     animator.onState({ kind: "needs_human", reason: "permission" });
-    await tickN(10); // mid rear-up
-    expect(beat().beat).toBe("alertUp");
-    animator.onState({ kind: "working" }); // you hit "yes" — agent resumes
-    await tickN(41 + 51); // alertUp finishes, walkOut plays out fully
+    await tickN(51); // the full rear-up plays out unanswered…
+    expect(beat().beat).toBe("walkOut"); // …so the cat starts stepping aside
+    animator.onState({ kind: "working" }); // answered only now, mid-exit
+    await tickN(51); // the walk-out finishes connected
     expect(beat().kind).toBe("waiting"); // NOT hidden: the cat owes a return
     now += APPEAR_DELAY_MS;
     await tickN(1);
