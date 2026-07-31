@@ -73,7 +73,7 @@ if (parsed.kind === "help") {
   process.exit(process.argv.length > 2 ? 0 : 2);
 }
 if (parsed.kind === "version") {
-  process.stdout.write("catsit 0.3.0\n");
+  process.stdout.write("catsit 0.3.1\n");
   process.exit(0);
 }
 if (parsed.kind === "error") {
@@ -220,6 +220,7 @@ child.onExit((code) => {
 
 if (process.stdin.isTTY) process.stdin.setRawMode(true);
 process.stdin.on("data", (d: Buffer) => {
+  animator?.onUserActivity(); // any keystroke (or mouse report) wakes a napping cat
   const r = gate.process(d);
   if (r.pass) child.write(r.pass);
   if (r.shooRequested) sm.shoo();

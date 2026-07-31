@@ -171,7 +171,16 @@ export class SpriteRenderer {
       return !b.loop && Math.floor((ticks * b.fps) / 10) >= b.b64.length - 1;
     }
     // pixel-art tiers have no footage; give each one-shot a nominal length
-    const nominal: Record<BeatName, number> = { walkIn: 12, sitDown: 4, idle: Infinity, alertUp: 14, walkOut: 12 };
+    const nominal: Record<BeatName, number> = {
+      walkIn: 12,
+      sitDown: 4,
+      idle: Infinity,
+      sleepDown: 4,
+      sleepLoop: Infinity,
+      wakeUp: 6,
+      alertUp: 14,
+      walkOut: 12,
+    };
     return ticks >= nominal[beat];
   }
 

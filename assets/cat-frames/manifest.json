@@ -20,6 +20,18 @@
     "walkOut": {
       "fps": 10,
       "loop": false
+    },
+    "sleepDown": {
+      "fps": 10,
+      "loop": false
+    },
+    "sleepLoop": {
+      "fps": 8,
+      "loop": true
+    },
+    "wakeUp": {
+      "fps": 10,
+      "loop": false
     }
   }
 }

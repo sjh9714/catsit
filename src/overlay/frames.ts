@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export type BeatName = "walkIn" | "sitDown" | "idle" | "alertUp" | "walkOut";
+export type BeatName = "walkIn" | "sitDown" | "idle" | "sleepDown" | "sleepLoop" | "wakeUp" | "alertUp" | "walkOut";
 
 export interface Beat {
   b64: string[]; // PNG data, base64, ready for kitty a=t,f=100

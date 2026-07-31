@@ -11,6 +11,10 @@ green stage and cut into frames:
 - `alertUp/` — startles, rears up on its hind legs in a silent meow, lands
   back on all fours (10fps, one-shot)
 - `walkOut/` — turns away and walks off (10fps, one-shot)
+- `sleepDown/` — gets drowsy and curls up into a ball (10fps, one-shot)
+- `sleepLoop/` — sleeps; breathing only, first and last frames identical
+  (8fps, loop)
+- `wakeUp/` — stirs, yawns, stretches, and sits back up (10fps, one-shot)
 
 Every beat was generated with its start frame pinned to the previous beat's
 last frame (Kling start/end frame conditioning), so beat boundaries are

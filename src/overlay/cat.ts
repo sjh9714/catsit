@@ -24,12 +24,16 @@ const TICK_MS = 100;
 export const BUBBLE_HOLD_MS = 1400;
 export const HINT_HOLD_MS = 4000;
 export const APPEAR_DELAY_MS = 3500;
+// no user activity this long → curls up (env override eases manual testing)
+export const SLEEP_AFTER_MS = Number(process.env["CATSIT_SLEEP_MS"]) || 60_000;
 const MEOW_HOLD_TICKS = 14; // bubble rides the alertUp beat this long
 
 // what plays after a one-shot beat finishes
 const NEXT_BEAT: Partial<Record<BeatName, BeatName>> = {
   walkIn: "sitDown",
   sitDown: "idle",
+  sleepDown: "sleepLoop",
+  wakeUp: "alertUp", // overridden to walkOut when the cat was shooed awake
   alertUp: "walkOut",
 };
 
@@ -38,6 +42,9 @@ const FALLBACK_FRAME: Record<BeatName, (ticks: number) => FrameName> = {
   walkIn: (t) => (t % 2 ? "walk1" : "walk2"),
   sitDown: () => "loaf1",
   idle: (t) => (Math.floor(t / 9) % 2 ? "loaf1" : "loaf2"),
+  sleepDown: () => "sleep1",
+  sleepLoop: (t) => (Math.floor(t / 12) % 2 ? "sleep1" : "sleep2"),
+  wakeUp: () => "alert",
   alertUp: () => "alert",
   walkOut: (t) => (t % 2 ? "walkE1" : "walkE2"),
 };
@@ -86,19 +93,56 @@ export class CatAnimator {
           // user was never told to look away, so no meow is owed
           this.anim = { kind: "hidden" };
         } else if (a.kind === "beat" && a.beat !== "alertUp" && a.beat !== "walkOut") {
-          this.anim = { kind: "beat", beat: "alertUp", ticks: 0 };
-          this.meowUntilTick = MEOW_HOLD_TICKS;
-          this.opts.bell();
-          this.render(); // the gate is already open; this is just the show
+          this.opts.bell(); // the gate is already open; the bell never waits
+          if (a.beat === "sleepLoop") {
+            this.wakeTarget = "alertUp";
+            this.anim = { kind: "beat", beat: "wakeUp", ticks: 0 };
+          } else if (a.beat === "sleepDown") {
+            this.wakeTarget = "alertUp";
+            this.pendingWake = true; // finish curling, then wake into the alert
+          } else if (a.beat === "wakeUp") {
+            this.wakeTarget = "alertUp";
+          } else {
+            this.anim = { kind: "beat", beat: "alertUp", ticks: 0 };
+            this.meowUntilTick = MEOW_HOLD_TICKS;
+          }
+          this.render();
         }
         break;
       case "shooed":
       case "unknown":
         if (a.kind === "waiting") this.anim = { kind: "hidden" };
         else if (a.kind === "beat" && a.beat !== "walkOut") {
-          this.anim = { kind: "beat", beat: "walkOut", ticks: 0 };
+          if (a.beat === "sleepLoop" || a.beat === "sleepDown" || a.beat === "wakeUp") {
+            this.wakeTarget = "walkOut";
+            if (a.beat === "sleepLoop") this.anim = { kind: "beat", beat: "wakeUp", ticks: 0 };
+            else if (a.beat === "sleepDown") this.pendingWake = true;
+          } else {
+            this.anim = { kind: "beat", beat: "walkOut", ticks: 0 };
+          }
         }
         break;
+    }
+  }
+
+  // sleep bookkeeping: the cat naps after SLEEP_AFTER_MS without user input,
+  // and any keystroke (or mouse event reaching stdin) wakes it groggily
+  private lastActivityAt = 0;
+  private pendingWake = false;
+  private wakeTarget: BeatName = "idle";
+
+  /** Any user input byte (keys, mouse reports). Wakes a sleeping cat. */
+  onUserActivity(): void {
+    if (this.stopped) return;
+    this.lastActivityAt = this.now();
+    if (this.anim.kind !== "beat") return;
+    if (this.anim.beat === "sleepLoop") {
+      this.wakeTarget = "idle";
+      this.anim = { kind: "beat", beat: "wakeUp", ticks: 0 };
+      this.render();
+    } else if (this.anim.beat === "sleepDown" && !this.pendingWake) {
+      this.wakeTarget = "idle";
+      this.pendingWake = true;
     }
   }
 
@@ -160,9 +204,18 @@ export class CatAnimator {
       case "beat": {
         this.anim.ticks++;
         if (this.meowUntilTick > 0) this.meowUntilTick--;
-        if (this.opts.renderer.beatDone(this.anim.beat, this.anim.ticks)) {
-          const next = NEXT_BEAT[this.anim.beat];
+        if (this.anim.beat === "idle" && t - this.lastActivityAt >= SLEEP_AFTER_MS) {
+          this.pendingWake = false;
+          this.wakeTarget = "idle";
+          this.anim = { kind: "beat", beat: "sleepDown", ticks: 0 };
+        } else if (this.opts.renderer.beatDone(this.anim.beat, this.anim.ticks)) {
+          let next = NEXT_BEAT[this.anim.beat];
+          if (this.anim.beat === "sleepDown") next = this.pendingWake ? "wakeUp" : "sleepLoop";
+          else if (this.anim.beat === "wakeUp") next = this.wakeTarget;
           if (next) {
+            this.pendingWake = false;
+            if (next === "alertUp") this.meowUntilTick = MEOW_HOLD_TICKS;
+            if (next === "idle") this.lastActivityAt = t; // a fresh 60s before napping
             this.anim = { kind: "beat", beat: next, ticks: 0 };
           } else if (this.anim.beat === "walkOut") {
             this.anim = { kind: "hidden" };
