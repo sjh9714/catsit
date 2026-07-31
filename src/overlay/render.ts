@@ -80,11 +80,28 @@ function settleSeq(count: number): number[] {
   return seq;
 }
 
+// Brisk wake: wakeUp minus the luxurious yawn (frames ~44%–84%), for waking
+// INTO an alert or an exit — an urgent wake shouldn't read as a first cry.
+// The groggy user-key wake keeps the full yawn; that one's the charm.
+let briskCache: { count: number; seq: number[] } | null = null;
+function briskWakeSeq(count: number): number[] {
+  if (briskCache?.count === count) return briskCache.seq;
+  const seq: number[] = [];
+  const yawnLo = Math.round(count * 0.44);
+  const yawnHi = Math.round(count * 0.84);
+  for (let f = 0; f <= yawnLo; f++) seq.push(f);
+  for (let f = yawnLo + 3; f < yawnHi; f += 3) seq.push(f);
+  for (let f = yawnHi; f < count; f++) seq.push(f);
+  briskCache = { count, seq };
+  return seq;
+}
+
 export interface DrawOpts {
   frame: FrameName; // pose for the pixel-art fallback tiers
   beat: BeatName; // performance beat for the kitty tier
   beatTicks: number; // 100ms ticks since the beat started
   reverse?: boolean; // play the beat's footage backwards (rear-down)
+  brisk?: boolean; // wakeUp only: skip the yawn (waking into an alert/exit)
   clearEpoch?: number; // mirror's screen-erase counter — a bump forces retransmit
   cellX: number;
   cellY: number;
@@ -221,7 +238,7 @@ export class SpriteRenderer {
    * Beat frame index for an animator tick count (ticks are 100ms). One-shot
    * beats clamp on their last frame; loops wrap.
    */
-  beatFrame(beat: BeatName, ticks: number, reverse = false): number {
+  beatFrame(beat: BeatName, ticks: number, reverse = false, brisk = false): number {
     const b = this.timing![beat];
     const raw = Math.floor((ticks * b.fps) / 10);
     if (reverse && beat === "alertUp") {
@@ -230,15 +247,24 @@ export class SpriteRenderer {
       const seq = settleSeq(b.count);
       return seq[Math.min(raw, seq.length - 1)]!;
     }
+    if (brisk && beat === "wakeUp") {
+      const seq = briskWakeSeq(b.count);
+      return seq[Math.min(raw, seq.length - 1)]!;
+    }
     const idx = b.loop ? raw % b.count : Math.min(raw, b.count - 1);
     return reverse ? b.count - 1 - idx : idx;
   }
 
   /** True when a one-shot beat has played through at `ticks` animator ticks. */
-  beatDone(beat: BeatName, ticks: number, reverse = false): boolean {
+  beatDone(beat: BeatName, ticks: number, reverse = false, brisk = false): boolean {
     if (this.timing) {
       const b = this.timing[beat];
-      const len = reverse && beat === "alertUp" ? settleSeq(b.count).length : b.count;
+      const len =
+        reverse && beat === "alertUp"
+          ? settleSeq(b.count).length
+          : brisk && beat === "wakeUp"
+            ? briskWakeSeq(b.count).length
+            : b.count;
       return !b.loop && Math.floor((ticks * b.fps) / 10) >= len - 1;
     }
     // pixel-art tiers have no footage; give each one-shot a nominal length
@@ -270,7 +296,7 @@ export class SpriteRenderer {
     }
     // the beat tick indexes frames deterministically, so app-repaint redraws
     // between animator ticks replay the SAME frame (no fast-forward)
-    const idx = this.beatFrame(o.beat, o.beatTicks, o.reverse);
+    const idx = this.beatFrame(o.beat, o.beatTicks, o.reverse, o.brisk);
     const vkey = `${o.beat}:${idx}`;
     this.log?.(`kitty draw ${vkey} x=${o.cellX} y=${o.cellY} vis=${visCols}`);
     let s = "";
@@ -299,7 +325,7 @@ export class SpriteRenderer {
     const rows = this.catRows;
     const visCols = Math.min(cols, o.cols - o.cellX);
     if (visCols <= 0) return "";
-    const idx = hf.beats[o.beat].offset + this.beatFrame(o.beat, o.beatTicks, o.reverse);
+    const idx = hf.beats[o.beat].offset + this.beatFrame(o.beat, o.beatTicks, o.reverse, o.brisk);
     const base = idx * hf.w * hf.h * 4;
     const sample = (cx: number, py: number): [number, number, number] | null => {
       const sx = Math.min(hf.w - 1, Math.floor(((cx + 0.5) * hf.w) / cols));

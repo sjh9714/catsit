@@ -73,7 +73,7 @@ if (parsed.kind === "help") {
   process.exit(process.argv.length > 2 ? 0 : 2);
 }
 if (parsed.kind === "version") {
-  process.stdout.write("catsit 0.6.0\n");
+  process.stdout.write("catsit 0.7.0\n");
   process.exit(0);
 }
 if (parsed.kind === "error") {
