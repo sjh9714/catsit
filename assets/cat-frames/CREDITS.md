@@ -1,22 +1,23 @@
-# Living-cat frames — sources & licenses
+# Living-cat frames — how they were made
 
-The PNG frames in this directory are cut from free stock videos on Pexels,
-under the [Pexels license](https://www.pexels.com/license/) (free to use and
-modify, attribution appreciated):
+The five beats in this directory are one continuous performance of an
+AI-generated white kitten, produced with Kling (video model 3.0) on a chroma
+green stage and cut into frames:
 
-- `idle/` (60 frames, sitting loop) — **"Fluffy White Cat Sitting by a Fence
-  Outdoors"** —
-  [pexels.com/video/34753028](https://www.pexels.com/video/fluffy-white-cat-sitting-by-a-fence-outdoors-34753028/)
-  by [Havvanur](https://www.pexels.com/@havvanur-2156235692/)
-- `walkL/` + `walkR/` (20-frame gait cycle, mirrored pair) — **"A white cat
-  standing on the ground looking out a window"** —
-  [pexels.com/video/16285100](https://www.pexels.com/video/a-white-cat-standing-on-the-ground-looking-out-a-window-16285100/)
-  by [Afeef kp](https://www.pexels.com/@afeef-kp-359546557/)
+- `walkIn/` — walks in from the right and turns to face you (10fps, one-shot)
+- `sitDown/` — settles into a sit (10fps, one-shot)
+- `idle/` — sits and breathes; first and last frames are identical, so it
+  loops seamlessly (8fps, loop)
+- `alertUp/` — startles, rears up on its hind legs in a silent meow, lands
+  back on all fours (10fps, one-shot)
+- `walkOut/` — turns away and walks off (10fps, one-shot)
 
-Pipeline (regenerable): 10–12fps frame extraction (ffmpeg) → per-frame
-background removal with `scripts/cutout.swift` (macOS Vision) → temporal alpha
-median + crop + scale via `scripts/video-post.mjs` (idle: union-bbox) and
-`scripts/video-post-walk.mjs` (walk: per-frame feet/center stabilization onto a
-fixed canvas + gait-cycle selection + hflip for the opposite direction). Idle
-playback ping-pongs; walk loops forward. All canvases are 256px tall with the
-cat's feet on the bottom edge, so every set shares one baseline.
+Every beat was generated with its start frame pinned to the previous beat's
+last frame (Kling start/end frame conditioning), so beat boundaries are
+pixel-identical and the whole cycle plays as a single connected take.
+
+Pipeline (regenerable): chroma key + despill (ffmpeg) → one shared crop
+window across all beats → 256px-tall canvas → PNG8 palette per beat
+(`scripts/`... see the repo's video scripts). `manifest.json` records each
+beat's capture fps, loop flag, and the cat's horizontal center used to anchor
+the speech bubble.

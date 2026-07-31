@@ -1,10 +1,16 @@
 // The cat's behavior: an animation state machine driven by the fused agent
 // state. The cat's presence IS the "you're not needed" signal; its departure
 // IS the notification.
+//
+// In the kitty tier the cat is one continuous filmed performance on a fixed
+// canvas: walkIn → sitDown → idle(loop) → alertUp → walkOut. Beats chain on
+// identical boundary frames, so nothing jumps and nothing slides. Fallback
+// tiers keep the pixel cat, mapped from the same states.
 
 import type { Compositor, Overlay } from "../compositor.js";
 import type { Mirror } from "../mirror.js";
 import type { CatState } from "../state.js";
+import type { BeatName } from "./frames.js";
 import { clipColumns, SpriteRenderer } from "./render.js";
 import type { FrameName } from "./sprites.js";
 
@@ -12,31 +18,33 @@ type Anim =
   | { kind: "hidden" }
   | { kind: "waiting"; since: number } // agent is working, but too recently —
   //   short turns come and go without the cat ever appearing (or meowing)
-  | { kind: "walk-in"; step: number }
-  | { kind: "loaf"; since: number }
-  | { kind: "flick"; until: number }
-  | { kind: "gulp"; until: number }
-  | { kind: "alert"; until: number }
-  | { kind: "walk-out"; step: number };
+  | { kind: "beat"; beat: BeatName; ticks: number };
 
-const TICK_MS = 100; // fast enough for the kitty video tier's 10fps frames
-// Walking is paced to the real footage's gait (~1 cell/tick ground speed), so
-// the legs visibly stride instead of the sprite sliding: one full 20-frame
-// gait cycle takes 2s, and each walk covers at least one cycle.
-const WALK_IN_STEPS = 22;
-const WALK_OUT_STEPS = 26;
-const TRAVEL_IN = 23; // cells from off-screen right to the anchor
-const TRAVEL_OUT = 30; // cells until the 34-col walk canvas clears the edge
-const SLEEP_AFTER_MS = 90_000;
-const MEOW_HOLD_MS = 1400;
+const TICK_MS = 100;
 export const BUBBLE_HOLD_MS = 1400;
 export const HINT_HOLD_MS = 4000;
 export const APPEAR_DELAY_MS = 3500;
+const MEOW_HOLD_TICKS = 14; // bubble rides the alertUp beat this long
+
+// what plays after a one-shot beat finishes
+const NEXT_BEAT: Partial<Record<BeatName, BeatName>> = {
+  walkIn: "sitDown",
+  sitDown: "idle",
+  alertUp: "walkOut",
+};
+
+// fallback-tier pose for each beat (pixel cat has no filmed transitions)
+const FALLBACK_FRAME: Record<BeatName, (ticks: number) => FrameName> = {
+  walkIn: (t) => (t % 2 ? "walk1" : "walk2"),
+  sitDown: () => "loaf1",
+  idle: (t) => (Math.floor(t / 9) % 2 ? "loaf1" : "loaf2"),
+  alertUp: () => "alert",
+  walkOut: (t) => (t % 2 ? "walkE1" : "walkE2"),
+};
 
 export class CatAnimator {
   private anim: Anim = { kind: "hidden" };
   private timer: NodeJS.Timeout | null = null;
-  private tickNo = 0;
   private stopped = false;
 
   constructor(
@@ -64,33 +72,31 @@ export class CatAnimator {
   /** Wire to StateMachine.onChange. */
   onState(next: CatState): void {
     if (this.stopped) return;
-    this.opts.log?.(`anim<-state ${next.kind}${"reason" in next ? ":" + next.reason : ""} (anim=${this.anim.kind})`);
+    const a = this.anim;
+    this.opts.log?.(`anim<-state ${next.kind}${"reason" in next ? ":" + next.reason : ""} (anim=${a.kind === "beat" ? a.beat : a.kind})`);
     switch (next.kind) {
       case "working":
-        if (this.anim.kind === "hidden") {
-          this.anim = { kind: "waiting", since: this.now() };
-        } else if (this.anim.kind === "walk-out") {
-          // the cat was just here — come straight back, no delay; map how far
-          // out it got onto the equivalent point of the walk back in
-          this.anim = { kind: "walk-in", step: Math.round((1 - this.anim.step / WALK_OUT_STEPS) * WALK_IN_STEPS) };
-        }
+        if (a.kind === "hidden") this.anim = { kind: "waiting", since: this.now() };
+        // mid-walkOut: let the cat finish leaving; the next tick sees state
+        // "working" again via hidden→waiting and it walks right back in
         break;
       case "needs_human":
-        if (this.anim.kind === "waiting") {
+        if (a.kind === "waiting") {
           // the turn ended before the cat ever appeared: stay silent — the
           // user was never told to look away, so no meow is owed
           this.anim = { kind: "hidden" };
-        } else if (this.anim.kind !== "hidden") {
-          this.anim = { kind: "alert", until: this.now() + MEOW_HOLD_MS };
+        } else if (a.kind === "beat" && a.beat !== "alertUp" && a.beat !== "walkOut") {
+          this.anim = { kind: "beat", beat: "alertUp", ticks: 0 };
+          this.meowUntilTick = MEOW_HOLD_TICKS;
           this.opts.bell();
           this.render(); // the gate is already open; this is just the show
         }
         break;
       case "shooed":
       case "unknown":
-        if (this.anim.kind === "waiting") this.anim = { kind: "hidden" };
-        else if (this.anim.kind !== "hidden" && this.anim.kind !== "walk-out") {
-          this.anim = { kind: "walk-out", step: 0 };
+        if (a.kind === "waiting") this.anim = { kind: "hidden" };
+        else if (a.kind === "beat" && a.beat !== "walkOut") {
+          this.anim = { kind: "beat", beat: "walkOut", ticks: 0 };
         }
         break;
     }
@@ -98,7 +104,7 @@ export class CatAnimator {
 
   /** In guard mode, keys are only gated while the cat is actually on screen. */
   get isVisible(): boolean {
-    return this.anim.kind !== "hidden" && this.anim.kind !== "waiting";
+    return this.anim.kind === "beat";
   }
 
   // feedback bubble state (guard mode): what the cat just ate, plus a
@@ -107,10 +113,11 @@ export class CatAnimator {
   private bubbleUntil = 0;
   private hintUntil = 0;
   private hintShown = false;
+  private meowUntilTick = 0; // counts down while alertUp plays
 
-  /** A keypress was swallowed — tail flick + show what was eaten. */
+  /** A keypress was swallowed — show what was eaten. */
   onSwallow(text = ""): void {
-    if (this.anim.kind !== "loaf" && this.anim.kind !== "flick" && this.anim.kind !== "gulp") return;
+    if (this.anim.kind !== "beat" || this.anim.beat === "walkOut") return;
     const t = this.now();
     this.bubbleText = t < this.bubbleUntil ? this.bubbleText + text : text;
     this.bubbleText = [...this.bubbleText].slice(-8).join("");
@@ -119,23 +126,20 @@ export class CatAnimator {
       this.hintShown = true;
       this.hintUntil = t + HINT_HOLD_MS;
     }
-    if (this.anim.kind === "loaf") this.anim = { kind: "flick", until: t + 450 };
     this.render();
   }
 
-  /** A whole paste was swallowed — gulp. */
+  /** A whole paste was swallowed. */
   onPaste(): void {
-    if (this.anim.kind === "loaf" || this.anim.kind === "flick") {
-      const t = this.now();
-      this.bubbleText = "(paste)";
-      this.bubbleUntil = t + BUBBLE_HOLD_MS;
-      if (!this.hintShown) {
-        this.hintShown = true;
-        this.hintUntil = t + HINT_HOLD_MS;
-      }
-      this.anim = { kind: "gulp", until: t + 700 };
-      this.render();
+    if (this.anim.kind !== "beat" || this.anim.beat === "walkOut") return;
+    const t = this.now();
+    this.bubbleText = "(paste)";
+    this.bubbleUntil = t + BUBBLE_HOLD_MS;
+    if (!this.hintShown) {
+      this.hintShown = true;
+      this.hintUntil = t + HINT_HOLD_MS;
     }
+    this.render();
   }
 
   private now(): number {
@@ -145,77 +149,33 @@ export class CatAnimator {
   /** One animation step. Public so tests can drive time deterministically. */
   tick(): void {
     if (this.stopped) return;
-    this.tickNo++;
     const t = this.now();
     switch (this.anim.kind) {
       case "hidden":
         return;
       case "waiting":
-        if (t - this.anim.since >= APPEAR_DELAY_MS) this.anim = { kind: "walk-in", step: 0 };
+        if (t - this.anim.since >= APPEAR_DELAY_MS) this.anim = { kind: "beat", beat: "walkIn", ticks: 0 };
         else return;
         break;
-      case "walk-in":
-        this.anim.step++;
-        if (this.anim.step >= WALK_IN_STEPS) this.anim = { kind: "loaf", since: t };
-        break;
-      case "walk-out":
-        this.anim.step++;
-        if (this.anim.step >= WALK_OUT_STEPS) {
-          this.anim = { kind: "hidden" };
-          this.lastRenderKey = "";
-          this.opts.log?.("anim hidden (walk-out complete)");
-          this.opts.compositor.setOverlay(null);
-          return;
+      case "beat": {
+        this.anim.ticks++;
+        if (this.meowUntilTick > 0) this.meowUntilTick--;
+        if (this.opts.renderer.beatDone(this.anim.beat, this.anim.ticks)) {
+          const next = NEXT_BEAT[this.anim.beat];
+          if (next) {
+            this.anim = { kind: "beat", beat: next, ticks: 0 };
+          } else if (this.anim.beat === "walkOut") {
+            this.anim = { kind: "hidden" };
+            this.lastRenderKey = "";
+            this.opts.log?.("anim hidden (walk-out complete)");
+            this.opts.compositor.setOverlay(null);
+            return;
+          }
         }
         break;
-      case "flick":
-        if (t >= this.anim.until) this.anim = { kind: "loaf", since: t - 1000 };
-        break;
-      case "gulp":
-        if (t >= this.anim.until) this.anim = { kind: "loaf", since: t - 1000 };
-        break;
-      case "alert":
-        if (t >= this.anim.until) this.anim = { kind: "walk-out", step: 0 };
-        break;
-      case "loaf":
-        break; // breathing handled by frame choice below
+      }
     }
     this.render();
-  }
-
-  private frameFor(t: number): FrameName {
-    switch (this.anim.kind) {
-      case "walk-in":
-        return this.tickNo % 2 ? "walk1" : "walk2";
-      case "walk-out":
-        return this.tickNo % 2 ? "walkE1" : "walkE2";
-      case "flick":
-        return "flick";
-      case "gulp":
-        return "gulp";
-      case "alert":
-        return "alert";
-      case "loaf": {
-        if (t - this.anim.since > SLEEP_AFTER_MS) return Math.floor(t / 1200) % 2 ? "sleep1" : "sleep2";
-        return Math.floor(t / 900) % 2 ? "loaf1" : "loaf2";
-      }
-      default:
-        return "loaf1";
-    }
-  }
-
-  /** Cat x offset: walks in from the right edge to the anchor. */
-  private xOffset(cols: number): number {
-    const catCols = this.opts.renderer.catCols;
-    const anchorX = Math.max(0, cols - catCols - 2);
-    if (this.anim.kind === "walk-in") {
-      const remaining = WALK_IN_STEPS - this.anim.step;
-      return anchorX + Math.round((TRAVEL_IN * remaining) / WALK_IN_STEPS);
-    }
-    if (this.anim.kind === "walk-out") {
-      return anchorX + Math.round((TRAVEL_OUT * this.anim.step) / WALK_OUT_STEPS);
-    }
-    return anchorX;
   }
 
   /**
@@ -240,12 +200,13 @@ export class CatAnimator {
   // and the kitty renderer can replace placements atomically.
   private cur = {
     frame: "loaf1" as FrameName,
+    beat: "idle" as BeatName,
+    beatTicks: 0,
     cellX: 0,
     cellY: 0,
     showMeow: false,
     bubble: null as string | null,
     hint: false,
-    vtick: 0,
   };
   private overlayObj: Overlay | null = null;
   private lastRenderKey = "";
@@ -259,22 +220,26 @@ export class CatAnimator {
       get damagesCells() {
         return damages();
       },
-      // The rect must cover EVERYTHING draw() can paint — bubbles, the hint
-      // line, and the wider walk frames (which extend ceil((maxCols-catCols)/2)
-      // cells left of cellX) — or hiding leaves orphaned cells.
-      rect: () => {
-        const pad = Math.max(8, Math.ceil((renderer.maxCols - renderer.catCols) / 2));
-        return {
-          x: cur.cellX - pad,
-          y: cur.cellY - 1,
-          w: pad + renderer.maxCols + 2,
-          h: renderer.catRows + 2,
-        };
-      },
+      // The rect must cover EVERYTHING draw() can paint — bubbles and the
+      // hint line included — or hiding the overlay leaves orphaned cells.
+      rect: () => ({
+        x: cur.cellX - 8,
+        y: cur.cellY - 1,
+        w: renderer.maxCols + 10,
+        h: renderer.catRows + 2,
+      }),
       draw: (cols, rows) => {
-        let s = renderer.draw({ frame: cur.frame, cellX: cur.cellX, cellY: cur.cellY, cols, rows, vtick: cur.vtick });
+        let s = renderer.draw({
+          frame: cur.frame,
+          beat: cur.beat,
+          beatTicks: cur.beatTicks,
+          cellX: cur.cellX,
+          cellY: cur.cellY,
+          cols,
+          rows,
+        });
         const bubbleRow = Math.max(1, cur.cellY); // 1-based CUP row = 0-based cellY-1
-        const bx = Math.max(0, cur.cellX - 8);
+        const bx = Math.max(0, cur.cellX + renderer.bubbleCol - 8);
         if (cur.showMeow) {
           s += `\x1b[${bubbleRow};${bx + 2}H\x1b[0;1;${renderer.fg(255, 220, 120)}m mew! \x1b[0m`;
         } else if (cur.bubble !== null) {
@@ -295,17 +260,19 @@ export class CatAnimator {
   }
 
   private render(): void {
-    if (this.anim.kind === "hidden" || this.anim.kind === "waiting") return;
+    if (this.anim.kind !== "beat") return;
     const t = this.now();
-    this.cur.frame = this.frameFor(t);
-    this.cur.cellX = this.xOffset(this.opts.mirror.cols);
+    const { beat, ticks } = this.anim;
+    this.cur.beat = beat;
+    this.cur.beatTicks = ticks;
+    this.cur.frame = FALLBACK_FRAME[beat](ticks);
+    this.cur.cellX = Math.max(0, this.opts.mirror.cols - this.opts.renderer.catCols - 1);
     this.cur.cellY = this.yAnchor(this.opts.mirror.rows);
-    this.cur.showMeow = this.anim.kind === "alert";
+    this.cur.showMeow = beat === "alertUp" && this.meowUntilTick > 0;
     this.cur.bubble = t < this.bubbleUntil && !this.cur.showMeow ? this.bubbleText : null;
     this.cur.hint = t < this.hintUntil && !this.cur.showMeow;
-    // video tier: every tick is a new frame of the living cat
-    this.cur.vtick = this.opts.renderer.animated ? this.tickNo : 0;
-    const key = `${this.cur.frame}|${this.cur.cellX}|${this.cur.cellY}|${this.cur.showMeow}|${this.cur.bubble ?? ""}|${this.cur.hint}|${this.cur.vtick}`;
+    const frameIdx = this.opts.renderer.modeName === "kitty" ? this.opts.renderer.beatFrame(beat, ticks) : this.cur.frame;
+    const key = `${beat}|${frameIdx}|${this.cur.cellX}|${this.cur.cellY}|${this.cur.showMeow}|${this.cur.bubble ?? ""}|${this.cur.hint}`;
     if (key === this.lastRenderKey) return; // nothing changed; forwards keep it drawn
     this.lastRenderKey = key;
     this.opts.compositor.setOverlay(this.ensureOverlay());

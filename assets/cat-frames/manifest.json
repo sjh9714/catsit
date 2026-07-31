@@ -1,0 +1,25 @@
+{
+  "centerX": 0.269,
+  "beats": {
+    "walkIn": {
+      "fps": 10,
+      "loop": false
+    },
+    "sitDown": {
+      "fps": 10,
+      "loop": false
+    },
+    "idle": {
+      "fps": 8,
+      "loop": true
+    },
+    "alertUp": {
+      "fps": 10,
+      "loop": false
+    },
+    "walkOut": {
+      "fps": 10,
+      "loop": false
+    }
+  }
+}

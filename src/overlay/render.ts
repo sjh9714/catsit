@@ -6,7 +6,7 @@
 // All modes draw the same frame geometry: FRAME_W cols × FRAME_H/2 rows.
 
 import { FRAME_H, FRAME_W, framePixels, type FrameName } from "./sprites.js";
-import { loadVideoFrames, type FrameSetName, type VideoFrames } from "./frames.js";
+import { loadVideoFrames, type BeatName, type VideoFrames } from "./frames.js";
 
 export type RenderMode = "kitty" | "half" | "kaomoji";
 
@@ -15,20 +15,11 @@ export const CAT_ROWS = FRAME_H / 2;
 
 const KITTY_IMG_BASE = 4200; // arbitrary id namespace for catsit
 
-// kitty tier shows the living cat: real-photo video frames advancing at the
-// animator's tick rate. Cells are ~1:2; every set's canvas is 256px tall and
-// bottom-anchored, so cols = round(aspect * rows * 2) keeps proportions and
-// the walking cat's feet stay on the sitting cat's baseline.
-export const VIDEO_ROWS = 9;
-export const VIDEO_COLS = 13; // idle 190×256
-export const WALK_COLS = 34; // walk 480×256
-
-/** Which frame set a sprite-frame name plays in the kitty tier. */
-function setFor(frame: FrameName): FrameSetName {
-  if (frame === "walk1" || frame === "walk2") return "walkL"; // entering: faces left
-  if (frame === "walkE1" || frame === "walkE2") return "walkR"; // leaving: faces right
-  return "idle";
-}
+// kitty tier shows the living cat: one continuous performance on a FIXED
+// canvas — the cat's movement (walking in, sitting, leaving) is the motion
+// baked into the footage itself, so nothing slides. All beats share one crop
+// window; the cell box just has to match its aspect (cells are ~1:2).
+export const VIDEO_ROWS = 13;
 
 export function detectRenderMode(env: NodeJS.ProcessEnv = process.env): RenderMode {
   const override = env["CATSIT_RENDER"];
@@ -69,12 +60,13 @@ export function rgbTo256(r: number, g: number, b: number): number {
 }
 
 export interface DrawOpts {
-  frame: FrameName;
-  cellX: number; // may be > cols-CAT_COLS during walk-in (clipped)
+  frame: FrameName; // pose for the pixel-art fallback tiers
+  beat: BeatName; // performance beat for the kitty tier
+  beatTicks: number; // 100ms ticks since the beat started
+  cellX: number;
   cellY: number;
   cols: number;
   rows: number;
-  vtick?: number; // animator tick counter; selects the video frame (kitty)
 }
 
 export class SpriteRenderer {
@@ -117,18 +109,32 @@ export class SpriteRenderer {
     return this.truecolor ? `48;2;${r};${g};${b}` : `48;5;${rgbTo256(r, g, b)}`;
   }
 
-  /** Cell footprint of the cat at rest in this render mode. */
+  /** Cell footprint of the (shared) canvas in this render mode. */
   get catCols(): number {
-    return this.mode === "kitty" ? VIDEO_COLS : CAT_COLS;
+    if (this.mode === "kitty") {
+      const c = this.frames!.beats.idle;
+      return Math.round((c.w / c.h) * VIDEO_ROWS * 2);
+    }
+    return CAT_COLS;
   }
 
   get catRows(): number {
     return this.mode === "kitty" ? VIDEO_ROWS : CAT_ROWS;
   }
 
-  /** Widest cell footprint any frame set can paint (walk frames are wider). */
+  /** All kitty beats share one canvas, so the widest footprint == catCols. */
   get maxCols(): number {
-    return this.mode === "kitty" ? WALK_COLS : CAT_COLS;
+    return this.catCols;
+  }
+
+  /**
+   * Column (within the canvas) the speech bubble anchors to — near the cat's
+   * head. The kitty canvas is wide with the cat off-center; fallback sprites
+   * fill their canvas, so 0 keeps their old bubble spot.
+   */
+  get bubbleCol(): number {
+    if (this.mode === "kitty") return Math.round(this.frames!.centerX * this.catCols);
+    return 0;
   }
 
   draw(o: DrawOpts): string {
@@ -148,21 +154,38 @@ export class SpriteRenderer {
     return "";
   }
 
+  /**
+   * Beat frame index for an animator tick count (ticks are 100ms). One-shot
+   * beats clamp on their last frame; loops wrap.
+   */
+  beatFrame(beat: BeatName, ticks: number): number {
+    const b = this.frames!.beats[beat];
+    const idx = Math.floor((ticks * b.fps) / 10);
+    return b.loop ? idx % b.b64.length : Math.min(idx, b.b64.length - 1);
+  }
+
+  /** True when a one-shot beat has played through at `ticks` animator ticks. */
+  beatDone(beat: BeatName, ticks: number): boolean {
+    if (this.frames) {
+      const b = this.frames.beats[beat];
+      return !b.loop && Math.floor((ticks * b.fps) / 10) >= b.b64.length - 1;
+    }
+    // pixel-art tiers have no footage; give each one-shot a nominal length
+    const nominal: Record<BeatName, number> = { walkIn: 12, sitDown: 4, idle: Infinity, alertUp: 14, walkOut: 12 };
+    return ticks >= nominal[beat];
+  }
+
   // ------------------------------------------------------------- kitty ----
   private drawKitty(o: DrawOpts): string {
-    const setName = setFor(o.frame);
-    const set = this.frames![setName];
-    const cols = Math.round((set.w / set.h) * this.catRows * 2);
-    // walk canvases are wider than the idle one; shift left so the cat's
-    // center stays on the idle cat's center
-    const cellX = o.cellX - Math.round((cols - this.catCols) / 2);
-    const visCols = Math.min(cols, o.cols - cellX);
-    if (visCols <= 0 || cellX + cols <= 0) return this.clear();
-    // vtick indexes the playback order deterministically, so app-repaint
-    // redraws between animator ticks replay the SAME frame (no fast-forward)
-    const idx = set.order[(o.vtick ?? 0) % set.order.length]!;
-    const vkey = `${setName}:${idx}`;
-    this.log?.(`kitty draw f=${o.frame} v=${vkey} x=${cellX} y=${o.cellY} vis=${visCols}`);
+    const set = this.frames!.beats[o.beat];
+    const cols = this.catCols;
+    const visCols = Math.min(cols, o.cols - o.cellX);
+    if (visCols <= 0) return this.clear();
+    // the beat tick indexes frames deterministically, so app-repaint redraws
+    // between animator ticks replay the SAME frame (no fast-forward)
+    const idx = this.beatFrame(o.beat, o.beatTicks);
+    const vkey = `${o.beat}:${idx}`;
+    this.log?.(`kitty draw ${vkey} x=${o.cellX} y=${o.cellY} vis=${visCols}`);
     let s = "";
     if (this.lastVKey !== vkey) {
       const b64 = set.b64[idx]!;
@@ -174,15 +197,9 @@ export class SpriteRenderer {
       }
       this.lastVKey = vkey;
     }
-    // clip on both edges: crop the source horizontally to the visible cells
-    const clipLeft = Math.max(0, -cellX);
-    const drawX = Math.max(0, cellX);
-    const drawCols = Math.min(cols - clipLeft, o.cols - drawX);
-    if (drawCols <= 0) return this.clear();
-    const srcX = Math.round((clipLeft / cols) * set.w);
-    const srcW = Math.round((drawCols / cols) * set.w);
-    s += `\x1b[${o.cellY + 1};${drawX + 1}H`;
-    s += `\x1b_Ga=p,i=${KITTY_IMG_BASE},p=1,z=1,C=1,q=2,x=${srcX},w=${srcW},c=${drawCols},r=${this.catRows}\x1b\\`;
+    const srcW = Math.round((visCols / cols) * set.w);
+    s += `\x1b[${o.cellY + 1};${o.cellX + 1}H`;
+    s += `\x1b_Ga=p,i=${KITTY_IMG_BASE},p=1,z=1,C=1,q=2,w=${srcW},c=${visCols},r=${this.catRows}\x1b\\`;
     this.placed = true;
     return s;
   }
