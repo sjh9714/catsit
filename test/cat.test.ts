@@ -211,6 +211,38 @@ describe("CatAnimator appear delay", () => {
     animator.stop();
   });
 
+  it("comes back after you approve: walkOut into working ends in waiting, not gone", async () => {
+    const animator = new CatAnimator({
+      compositor: comp,
+      mirror: comp.screen,
+      renderer: new SpriteRenderer("half"),
+      bell: () => {},
+      now: () => now,
+    });
+    const beat = () => (animator as unknown as { anim: { kind: string; beat?: string } }).anim;
+    const tickN = async (n: number) => {
+      for (let i = 0; i < n; i++) {
+        now += 200;
+        animator.tick();
+        await pump();
+      }
+    };
+    await feed("some app content\r\n");
+    animator.onState({ kind: "working" });
+    now += APPEAR_DELAY_MS;
+    await tickN(102); // seated
+    animator.onState({ kind: "needs_human", reason: "permission" });
+    await tickN(10); // mid rear-up
+    expect(beat().beat).toBe("alertUp");
+    animator.onState({ kind: "working" }); // you hit "yes" — agent resumes
+    await tickN(41 + 51); // alertUp finishes, walkOut plays out fully
+    expect(beat().kind).toBe("waiting"); // NOT hidden: the cat owes a return
+    now += APPEAR_DELAY_MS;
+    await tickN(1);
+    expect(beat().beat).toBe("walkIn"); // and walks right back in
+    animator.stop();
+  });
+
   it("guard visibility follows the cat, not the state", async () => {
     const animator = new CatAnimator({
       compositor: comp,

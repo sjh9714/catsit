@@ -81,8 +81,11 @@ export class CatAnimator {
   }
 
   /** Wire to StateMachine.onChange. */
+  private lastState: CatState = { kind: "unknown" };
+
   onState(next: CatState): void {
     if (this.stopped) return;
+    this.lastState = next;
     const a = this.anim;
     this.opts.log?.(`anim<-state ${next.kind}${"reason" in next ? ":" + next.reason : ""} (anim=${a.kind === "beat" ? a.beat : a.kind})`);
     switch (next.kind) {
@@ -242,9 +245,13 @@ export class CatAnimator {
             // you've been away all along, the cat settles and naps soon after
             this.anim = { kind: "beat", beat: next, ticks: 0 };
           } else if (this.anim.beat === "walkOut") {
-            this.anim = { kind: "hidden" };
+            // if the agent went back to work while the cat was busy leaving
+            // (you approved the prompt), come back after the usual delay —
+            // otherwise that "working" transition is already spent and the
+            // cat would stay gone for the whole rest of the task
+            this.anim = this.lastState.kind === "working" ? { kind: "waiting", since: t } : { kind: "hidden" };
             this.lastRenderKey = "";
-            this.opts.log?.("anim hidden (walk-out complete)");
+            this.opts.log?.(`anim ${this.anim.kind} (walk-out complete)`);
             this.opts.compositor.setOverlay(null);
             return;
           }
