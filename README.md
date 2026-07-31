@@ -11,6 +11,8 @@ The moment you're needed — permission prompt, question, done — it rears up, 
 
 <sub>One kitten, one continuous take — not a sprite sheet (see the FAQ for how it was made). By default catsit never touches your input; <code>--guard</code> is opt-in.</sub>
 
+<b>Full-quality kitten in kitty · Ghostty · WezTerm · iTerm2</b> — every other terminal gets the lo-fi living cat.
+
 [한국어](README.ko.md) · [日本語](README.ja.md) · [简体中文](README.zh-CN.md)
 
 </div>
@@ -37,6 +39,10 @@ One continuous performance, one kitten — every transition connects.
 ```
 npx catsit --demo
 ```
+
+Run it in **kitty, Ghostty, WezTerm, or iTerm2** to meet the full-quality
+kitten. Anywhere else (Terminal.app, VS Code, tmux…) you get the lo-fi
+half-block version — same cat, chunkier pixels.
 
 ## Use it
 

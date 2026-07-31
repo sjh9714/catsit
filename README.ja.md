@@ -11,6 +11,8 @@ Claude が作業している間、本物の子猫がターミナルの上に座�
 
 <sub>一匹の連続ワンテイク — スプライトではありません（作り方はクレジット参照）。デフォルトでは入力に一切触れず、<code>--guard</code> はオプトインです。</sub>
 
+<b>高画質の子猫は kitty · Ghostty · WezTerm · iTerm2 で</b> — それ以外のターミナルでは低解像度の生きた猫になります。
+
 [English](README.md) · [한국어](README.ko.md) · [简体中文](README.zh-CN.md)
 
 </div>
@@ -37,6 +39,10 @@ Claude が作業している間、本物の子猫がターミナルの上に座�
 ```
 npx catsit --demo
 ```
+
+**kitty・Ghostty・WezTerm・iTerm2** で実行するとフル画質の子猫に会えます。
+それ以外（Terminal.app、VS Code、tmux…）では低解像度の半ブロック版 —
+同じ猫、太いピクセルです。
 
 ## 使い方
 

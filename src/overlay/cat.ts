@@ -166,6 +166,8 @@ export class CatAnimator {
   private bubbleUntil = 0;
   private hintUntil = 0;
   private hintShown = false;
+  private hintText = " guarding · ctrl+g to shoo";
+  private tierHintShown = false;
   private meowUntilTick = 0; // counts down while alertUp plays
 
   /** A keypress was swallowed — show what was eaten. */
@@ -177,6 +179,7 @@ export class CatAnimator {
     this.bubbleUntil = t + BUBBLE_HOLD_MS;
     if (!this.hintShown) {
       this.hintShown = true;
+      this.hintText = " guarding · ctrl+g to shoo";
       this.hintUntil = t + HINT_HOLD_MS;
     }
     this.render();
@@ -190,6 +193,7 @@ export class CatAnimator {
     this.bubbleUntil = t + BUBBLE_HOLD_MS;
     if (!this.hintShown) {
       this.hintShown = true;
+      this.hintText = " guarding · ctrl+g to shoo";
       this.hintUntil = t + HINT_HOLD_MS;
     }
     this.render();
@@ -273,6 +277,7 @@ export class CatAnimator {
     showMeow: false,
     bubble: null as string | null,
     hint: false,
+    hintText: "",
   };
   private overlayObj: Overlay | null = null;
   private lastRenderKey = "";
@@ -306,16 +311,19 @@ export class CatAnimator {
         });
         const bubbleRow = Math.max(1, cur.cellY); // 1-based CUP row = 0-based cellY-1
         const bx = Math.max(0, cur.cellX + renderer.bubbleCol - 8);
-        if (cur.showMeow) {
-          s += `\x1b[${bubbleRow};${bx + 2}H\x1b[0;1;${renderer.fg(255, 220, 120)}m mew! \x1b[0m`;
-        } else if (cur.bubble !== null) {
+        // never paint past the right edge — a wrapped line lands OUTSIDE the
+        // overlay rect and survives as residue
+        const avail = Math.max(0, cols - bx - 1);
+        if (cur.showMeow && avail > 2) {
+          s += `\x1b[${bubbleRow};${bx + 2}H\x1b[0;1;${renderer.fg(255, 220, 120)}m${clipColumns(" mew! ", avail - 1)}\x1b[0m`;
+        } else if (cur.bubble !== null && avail > 4) {
           // what the cat just ate (guard mode)
-          s += `\x1b[${bubbleRow};${bx + 1}H\x1b[0;${renderer.fg(30, 30, 30)};${renderer.bg(255, 220, 120)}m 🐟 ${clipColumns(cur.bubble, 8)} \x1b[0m`;
+          s += `\x1b[${bubbleRow};${bx + 1}H\x1b[0;${renderer.fg(30, 30, 30)};${renderer.bg(255, 220, 120)}m${clipColumns(` 🐟 ${cur.bubble} `, Math.min(14, avail))}\x1b[0m`;
         }
-        if (cur.hint) {
+        if (cur.hint && avail > 4) {
           const hintRow = cur.cellY + renderer.catRows + 1; // 1-based; last row of the rect
           if (hintRow >= 1 && hintRow <= rows) {
-            s += `\x1b[${hintRow};${bx + 1}H\x1b[0;2m${clipColumns(" guarding · ctrl+g to shoo", renderer.catCols + 9)}\x1b[0m`;
+            s += `\x1b[${hintRow};${bx + 1}H\x1b[0;2m${clipColumns(cur.hintText, Math.min(renderer.catCols + 9, avail))}\x1b[0m`;
           }
         }
         return s;
@@ -329,6 +337,12 @@ export class CatAnimator {
     if (this.anim.kind !== "beat") return;
     const t = this.now();
     this.opts.renderer.fit(this.opts.mirror.rows); // scale to the terminal
+    if (!this.tierHintShown && this.opts.renderer.lofi) {
+      // lo-fi tier: tell first-timers where the full-quality cat lives
+      this.tierHintShown = true;
+      this.hintText = " HD cat: kitty · ghostty · wezterm · iterm2";
+      this.hintUntil = t + 6000;
+    }
     const { beat, ticks } = this.anim;
     this.cur.beat = beat;
     this.cur.beatTicks = ticks;
@@ -339,6 +353,7 @@ export class CatAnimator {
 
     this.cur.bubble = t < this.bubbleUntil && !this.cur.showMeow ? this.bubbleText : null;
     this.cur.hint = t < this.hintUntil && !this.cur.showMeow;
+    this.cur.hintText = this.hintText;
     const frameIdx = this.opts.renderer.modeName === "kitty" ? this.opts.renderer.beatFrame(beat, ticks) : this.cur.frame;
     const key = `${beat}|${frameIdx}|${this.cur.cellX}|${this.cur.cellY}|${this.cur.showMeow}|${this.cur.bubble ?? ""}|${this.cur.hint}`;
     if (key === this.lastRenderKey) return; // nothing changed; forwards keep it drawn

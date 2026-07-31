@@ -11,6 +11,8 @@ Claude 工作时，一只真实的小猫坐在你的终端上守望。<br>
 
 <sub>同一只猫的连续一镜到底 —— 不是精灵图（制作方式见致谢）。默认情况下 catsit 绝不碰你的输入，<code>--guard</code> 为可选项。</sub>
 
+<b>高清小猫需要 kitty · Ghostty · WezTerm · iTerm2</b> —— 其他终端显示低清版活猫。
+
 [English](README.md) · [한국어](README.ko.md) · [日本語](README.ja.md)
 
 </div>
@@ -37,6 +39,10 @@ Claude 工作时，一只真实的小猫坐在你的终端上守望。<br>
 ```
 npx catsit --demo
 ```
+
+在 **kitty、Ghostty、WezTerm、iTerm2** 中运行即可见到高清小猫。
+其他终端（Terminal.app、VS Code、tmux…）显示低清半块版 ——
+同一只猫，更粗的像素。
 
 ## 使用
 

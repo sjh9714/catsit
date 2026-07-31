@@ -147,6 +147,11 @@ export class SpriteRenderer {
     return this.timing !== null;
   }
 
+  /** True when this terminal plays the lo-fi half-block version. */
+  get lofi(): boolean {
+    return this.mode === "half" && this.half !== null;
+  }
+
   /** Cell footprint of the (shared) canvas in this render mode. */
   get catCols(): number {
     if (this.mode === "kitty") {

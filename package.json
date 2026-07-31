@@ -1,6 +1,6 @@
 {
   "name": "catsit",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "A cat that babysits your AI agent so you don't have to. While Claude works, the cat sits on your terminal; when you're needed, the cat gets up.",
   "keywords": [
     "claude-code",

@@ -11,6 +11,8 @@ Claude가 일하는 동안 진짜 아기 고양이가 터미널 위에 앉아 �
 
 <sub>한 마리의 연속 원테이크 — 스프라이트가 아닙니다 (만든 방법은 FAQ에). 기본값에서는 입력을 절대 건드리지 않으며 <code>--guard</code>는 옵트인입니다.</sub>
 
+<b>고화질 고양이는 kitty · Ghostty · WezTerm · iTerm2에서</b> — 그 외 터미널은 저해상 살아있는 고양이가 나옵니다.
+
 [English](README.md) · [日本語](README.ja.md) · [简体中文](README.zh-CN.md)
 
 </div>
@@ -37,6 +39,10 @@ Claude가 일하는 동안 진짜 아기 고양이가 터미널 위에 앉아 �
 ```
 npx catsit --demo
 ```
+
+**kitty, Ghostty, WezTerm, iTerm2**에서 실행하면 고화질 고양이를 만납니다.
+그 외(Terminal.app, VS Code, tmux…)에서는 저해상 반블록 버전이 나옵니다 —
+같은 고양이, 굵은 픽셀.
 
 ## 사용법
 
