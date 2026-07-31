@@ -88,7 +88,7 @@ catsit は通知を反転させます。猫の**存在そのもの**がシグナ
 | ターミナル | 表示 |
 |---|---|
 | kitty, Ghostty, WezTerm, iTerm2 3.6+, Konsole | テキストの**上に浮かぶ**本物の子猫 — 歩いて入り、座って待ち、立ち上がって鳴き、歩き去る連続撮影の演技（kitty graphics protocol） |
-| その他（tmux, VS Code, Terminal.app 含む） | トゥルーカラー半ブロックのピクセル猫 |
+| その他（tmux, VS Code, Terminal.app 含む） | 同じ生きた子猫をドット風の半ブロックで — 低解像度でも歩き、眠り、鳴きます |
 | `NO_COLOR` / dumb 端末 | つつましい顔文字 `(=˘ω˘=)` |
 
 ## 仕組み

@@ -6,7 +6,7 @@
 // All modes draw the same frame geometry: FRAME_W cols × FRAME_H/2 rows.
 
 import { FRAME_H, FRAME_W, framePixels, type FrameName } from "./sprites.js";
-import { loadVideoFrames, type BeatName, type VideoFrames } from "./frames.js";
+import { loadHalfFrames, loadVideoFrames, type BeatName, type HalfFrames, type VideoFrames } from "./frames.js";
 
 export type RenderMode = "kitty" | "half" | "kaomoji";
 
@@ -83,6 +83,10 @@ export class SpriteRenderer {
   private lastVKey: string | null = null;
   private placed = false;
   private frames: VideoFrames | null = null;
+  private half: HalfFrames | null = null;
+  // beat timing shared by both video tiers (null → pixel-art nominal lengths)
+  private timing: Record<BeatName, { fps: number; loop: boolean; count: number }> | null = null;
+  private centerX = 0;
 
   constructor(
     private mode: RenderMode,
@@ -92,6 +96,22 @@ export class SpriteRenderer {
     if (mode === "kitty") {
       this.frames = loadVideoFrames(log);
       if (!this.frames) this.mode = "half"; // broken install: degrade, never die
+    }
+    if (this.mode === "kitty" && this.frames) {
+      const t = {} as NonNullable<typeof this.timing>;
+      for (const [name, b] of Object.entries(this.frames.beats)) t[name as BeatName] = { fps: b.fps, loop: b.loop, count: b.b64.length };
+      this.timing = t;
+      this.centerX = this.frames.centerX;
+    } else if (this.mode === "half") {
+      this.half = loadHalfFrames(log); // null → classic pixel cat
+      if (this.half) {
+        const t = {} as NonNullable<typeof this.timing>;
+        for (const [name, b] of Object.entries(this.half.beats)) {
+          t[name as BeatName] = { ...this.half.meta[name as BeatName], count: b.count };
+        }
+        this.timing = t;
+        this.centerX = this.half.centerX;
+      }
     }
   }
 
@@ -122,31 +142,37 @@ export class SpriteRenderer {
     this.fitRows = Math.min(VIDEO_ROWS_MAX, Math.max(VIDEO_ROWS_MIN, Math.floor(termRows * VIDEO_ROWS_FRACTION)));
   }
 
+  /** True when the living-cat frames drive this renderer (kitty or half). */
+  private get videoActive(): boolean {
+    return this.timing !== null;
+  }
+
   /** Cell footprint of the (shared) canvas in this render mode. */
   get catCols(): number {
     if (this.mode === "kitty") {
       const c = this.frames!.beats.idle;
       return Math.round((c.w / c.h) * this.fitRows * 2);
     }
+    if (this.half) return Math.round((this.half.w / this.half.h) * this.fitRows * 2);
     return CAT_COLS;
   }
 
   get catRows(): number {
-    return this.mode === "kitty" ? this.fitRows : CAT_ROWS;
+    return this.videoActive ? this.fitRows : CAT_ROWS;
   }
 
-  /** All kitty beats share one canvas, so the widest footprint == catCols. */
+  /** All video beats share one canvas, so the widest footprint == catCols. */
   get maxCols(): number {
     return this.catCols;
   }
 
   /**
    * Column (within the canvas) the speech bubble anchors to — near the cat's
-   * head. The kitty canvas is wide with the cat off-center; fallback sprites
+   * head. The video canvas is wide with the cat off-center; fallback sprites
    * fill their canvas, so 0 keeps their old bubble spot.
    */
   get bubbleCol(): number {
-    if (this.mode === "kitty") return Math.round(this.frames!.centerX * this.catCols);
+    if (this.videoActive) return Math.round(this.centerX * this.catCols);
     return 0;
   }
 
@@ -172,16 +198,16 @@ export class SpriteRenderer {
    * beats clamp on their last frame; loops wrap.
    */
   beatFrame(beat: BeatName, ticks: number): number {
-    const b = this.frames!.beats[beat];
+    const b = this.timing![beat];
     const idx = Math.floor((ticks * b.fps) / 10);
-    return b.loop ? idx % b.b64.length : Math.min(idx, b.b64.length - 1);
+    return b.loop ? idx % b.count : Math.min(idx, b.count - 1);
   }
 
   /** True when a one-shot beat has played through at `ticks` animator ticks. */
   beatDone(beat: BeatName, ticks: number): boolean {
-    if (this.frames) {
-      const b = this.frames.beats[beat];
-      return !b.loop && Math.floor((ticks * b.fps) / 10) >= b.b64.length - 1;
+    if (this.timing) {
+      const b = this.timing[beat];
+      return !b.loop && Math.floor((ticks * b.fps) / 10) >= b.count - 1;
     }
     // pixel-art tiers have no footage; give each one-shot a nominal length
     const nominal: Record<BeatName, number> = {
@@ -227,7 +253,52 @@ export class SpriteRenderer {
   }
 
   // -------------------------------------------------------- half blocks ----
+  /** The living cat in ▀ half-blocks: nearest-sample the baked low-res grid. */
+  private drawHalfVideo(o: DrawOpts): string {
+    const hf = this.half!;
+    const cols = this.catCols;
+    const rows = this.catRows;
+    const visCols = Math.min(cols, o.cols - o.cellX);
+    if (visCols <= 0) return "";
+    const idx = hf.beats[o.beat].offset + this.beatFrame(o.beat, o.beatTicks);
+    const base = idx * hf.w * hf.h * 4;
+    const sample = (cx: number, py: number): [number, number, number] | null => {
+      const sx = Math.min(hf.w - 1, Math.floor(((cx + 0.5) * hf.w) / cols));
+      const sy = Math.min(hf.h - 1, Math.floor(((py + 0.5) * hf.h) / (rows * 2)));
+      const i = base + (sy * hf.w + sx) * 4;
+      if (hf.data[i + 3]! < 128) return null;
+      return [hf.data[i]!, hf.data[i + 1]!, hf.data[i + 2]!];
+    };
+    let s = "";
+    for (let cy = 0; cy < rows; cy++) {
+      const row = o.cellY + cy;
+      if (row < 0 || row >= o.rows) continue;
+      let run = "";
+      let runStart = -1;
+      const flush = () => {
+        if (runStart >= 0 && run) s += `\x1b[${row + 1};${o.cellX + runStart + 1}H` + run + "\x1b[0m";
+        run = "";
+        runStart = -1;
+      };
+      for (let cx = 0; cx < visCols; cx++) {
+        const top = sample(cx, cy * 2);
+        const bot = sample(cx, cy * 2 + 1);
+        if (!top && !bot) {
+          flush();
+          continue;
+        }
+        if (runStart === -1) runStart = cx;
+        if (top && bot) run += `\x1b[${this.fg(top[0], top[1], top[2])};${this.bg(bot[0], bot[1], bot[2])}m▀`;
+        else if (top) run += `\x1b[0;${this.fg(top[0], top[1], top[2])}m▀`;
+        else run += `\x1b[0;${this.fg(bot![0], bot![1], bot![2])}m▄`;
+      }
+      flush();
+    }
+    return s;
+  }
+
   private drawHalf(o: DrawOpts): string {
+    if (this.half) return this.drawHalfVideo(o);
     const px = framePixels(o.frame);
     let s = "";
     const visCols = Math.min(CAT_COLS, o.cols - o.cellX);

@@ -20,6 +20,10 @@ Every beat was generated with its start frame pinned to the previous beat's
 last frame (Kling start/end frame conditioning), so beat boundaries are
 pixel-identical and the whole cycle plays as a single connected take.
 
+`half.bin` is the same performance baked to a 36×26 RGBA grid per frame
+(scripts/gen-half.mjs) for terminals without graphics support — they render
+it as ▀ half-blocks.
+
 Pipeline (regenerable): chroma key + despill (ffmpeg) → one shared crop
 window across all beats → 256px-tall canvas → PNG8 palette per beat
 (`scripts/`... see the repo's video scripts). `manifest.json` records each

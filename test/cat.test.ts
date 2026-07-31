@@ -143,36 +143,36 @@ describe("CatAnimator appear delay", () => {
     await feed("some app content\r\n");
     animator.onState({ kind: "working" });
     now += APPEAR_DELAY_MS;
-    await tickN(13 + 5 + 1); // walkIn + sitDown + first idle tick
+    await tickN(50 + 50 + 2); // real beat lengths: walkIn + sitDown + idle
     expect(beat().beat).toBe("idle");
 
     // 60s of quiet → the cat curls up and naps
     now += SLEEP_AFTER_MS;
     await tickN(1);
     expect(beat().beat).toBe("sleepDown");
-    await tickN(5);
+    await tickN(50);
     expect(beat().beat).toBe("sleepLoop");
 
     // a keystroke wakes it groggily, back to sitting (no meow)
     animator.onUserActivity();
     expect(beat().beat).toBe("wakeUp");
-    await tickN(7);
+    await tickN(51);
     expect(beat().beat).toBe("idle");
 
     // quiet again → asleep again; this time the agent needs a human
     now += SLEEP_AFTER_MS;
-    await tickN(6);
+    await tickN(52);
     expect(beat().beat).toBe("sleepLoop");
     let bells = 0;
     (animator as unknown as { opts: { bell: () => void } }).opts.bell = () => bells++;
     animator.onState({ kind: "needs_human", reason: "permission" });
     expect(bells).toBe(1); // the bell never waits for the animation
     expect(beat().beat).toBe("wakeUp");
-    await tickN(7);
+    await tickN(51);
     expect(beat().beat).toBe("alertUp");
-    await tickN(15);
+    await tickN(51);
     expect(beat().beat).toBe("walkOut");
-    await tickN(13);
+    await tickN(51);
     expect(animator.isVisible).toBe(false);
     expect(diffScreens(comp.screen, user)).toEqual([]);
     animator.stop();

@@ -91,7 +91,7 @@ Want the cat to actually stop you from micromanaging? `catsit --guard claude`:
 | Terminal | You get |
 |---|---|
 | kitty, Ghostty, WezTerm, iTerm2 3.6+, Konsole | a real kitten — one continuous filmed performance floating **above** the text (kitty graphics protocol): it walks in, sits down, waits, rears up in a meow, and walks off |
-| everything else (incl. tmux, VS Code, Terminal.app) | a truecolor pixel cat drawn in half-blocks |
+| everything else (incl. tmux, VS Code, Terminal.app) | the same living kitten in chunky truecolor half-blocks — lo-fi, but it still walks, naps, and meows |
 | `NO_COLOR` / dumb terminals | a humble kaomoji `(=˘ω˘=)` |
 
 ## How it works
@@ -147,5 +147,7 @@ different cat, different problem: it guards the *agent*, from *you*.
 
 The kitten itself is an AI-generated continuous performance (Kling), cut into
 seamlessly chained beats — see [assets/cat-frames/CREDITS.md](assets/cat-frames/CREDITS.md).
+Terminals without graphics support play the same beats from a pre-baked
+low-res grid (half.bin) as half-block cells.
 
 MIT © JinHyuk Sung

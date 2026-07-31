@@ -8,6 +8,7 @@
 // renderer maps animator ticks (100ms) onto frame indexes with that fps.
 
 import fs from "node:fs";
+import zlib from "node:zlib";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -77,7 +78,65 @@ export function loadVideoFrames(log?: (msg: string) => void): VideoFrames | null
   return cached;
 }
 
-/** Test hook: forget the cached frame set. */
+// ---------------------------------------------------------------- half ----
+// Terminals without the kitty graphics protocol play the same beats from a
+// tiny pre-baked RGBA grid (half.bin) rendered as ▀ half-blocks.
+
+export interface HalfFrames {
+  w: number; // pixel size of every baked frame
+  h: number;
+  beats: Record<BeatName, { offset: number; count: number }>;
+  meta: Record<BeatName, { fps: number; loop: boolean }>;
+  centerX: number;
+  data: Buffer; // frames concatenated, w*h*4 bytes each
+}
+
+let cachedHalf: HalfFrames | null | undefined;
+
+/** Load the baked half-block frames, or null (falls back to the pixel cat). */
+export function loadHalfFrames(log?: (msg: string) => void): HalfFrames | null {
+  if (cachedHalf !== undefined) return cachedHalf;
+  const candidates = ["../assets/cat-frames", "../../assets/cat-frames"];
+  cachedHalf = null;
+  for (const rel of candidates) {
+    let base: string;
+    try {
+      base = fileURLToPath(new URL(rel, import.meta.url));
+    } catch {
+      continue;
+    }
+    try {
+      const bin = fs.readFileSync(path.join(base, "half.bin"));
+      const nl = bin.indexOf(0x0a);
+      const header = JSON.parse(bin.subarray(0, nl).toString("utf8")) as {
+        w: number;
+        h: number;
+        beats: Record<BeatName, { offset: number; count: number }>;
+      };
+      const manifest = JSON.parse(fs.readFileSync(path.join(base, "manifest.json"), "utf8")) as {
+        centerX: number;
+        beats: Record<BeatName, { fps: number; loop: boolean }>;
+      };
+      cachedHalf = {
+        w: header.w,
+        h: header.h,
+        beats: header.beats,
+        meta: manifest.beats,
+        centerX: manifest.centerX,
+        data: zlib.inflateSync(bin.subarray(nl + 1)),
+      };
+      log?.(`half frames loaded from ${base}`);
+      return cachedHalf;
+    } catch {
+      // try the next candidate
+    }
+  }
+  log?.("half.bin missing: half tier falls back to the pixel cat");
+  return cachedHalf;
+}
+
+/** Test hook: forget the cached frame sets. */
 export function resetVideoFramesCache(): void {
   cached = undefined;
+  cachedHalf = undefined;
 }

@@ -85,7 +85,7 @@ catsit 把通知反转过来。猫的**存在本身**就是信号：
 | 终端 | 效果 |
 |---|---|
 | kitty、Ghostty、WezTerm、iTerm2 3.6+、Konsole | 一只真实小猫**悬浮在文字上方** —— 走进来、坐下、等待、直立喵叫、走开，全程连续表演（kitty 图形协议） |
-| 其他（含 tmux、VS Code、Terminal.app） | 真彩色半块像素猫 |
+| 其他（含 tmux、VS Code、Terminal.app） | 同一只活猫的像素半块版 —— 低清但照样走路、打盹、喵叫 |
 | `NO_COLOR` / dumb 终端 | 朴素的颜文字 `(=˘ω˘=)` |
 
 ## 原理
