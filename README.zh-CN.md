@@ -12,7 +12,7 @@ Claude 工作时，一只真实的小猫坐在你的终端上守望。<br>
 
 <sub>同一只猫的连续一镜到底 —— 不是精灵图（制作方式见致谢）。默认情况下 catsit 绝不碰你的输入，<code>--guard</code> 为可选项。</sub>
 
-<b>高清小猫需要 kitty · Ghostty · WezTerm · iTerm2</b> —— 其他终端显示低清版活猫。
+<b>想看高清小猫，请用 kitty · Ghostty · WezTerm · iTerm2</b> —— 其他终端会显示像素版的活猫。
 
 [English](README.md) · [한국어](README.ko.md) · [日本語](README.ja.md)
 
