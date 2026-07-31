@@ -5,9 +5,10 @@
 **A cat that babysits your AI agent, so you don't have to.**
 
 While Claude works, a real kitten sits on your terminal and keeps watch.<br>
-The moment you're needed — permission prompt, question, done — it rears up, meows, and steps aside.
+The moment you're needed it rears up, meows once, and sits back beside you.<br>
+When the task is done it quietly walks off — the cat leaving is the done signal.
 
-<img src="docs/assets/demo.gif" alt="catsit demo: a real white kitten walks onto the terminal, sits while Claude Code works, then rears up in a meow when a permission prompt appears and walks off" width="720">
+<img src="docs/assets/demo.gif" alt="catsit demo: a real white kitten walks onto the terminal, sits while Claude Code works, naps, rears up in a meow when a permission prompt appears, sits back down, and walks off when the task is done" width="720">
 
 <sub>One kitten, one continuous take — not a sprite sheet (see the FAQ for how it was made). By default catsit never touches your input; <code>--guard</code> is opt-in.</sub>
 
@@ -29,8 +30,8 @@ One continuous performance, one kitten — every transition connects.
 </tr>
 <tr>
 <td align="center"><b>you touch a key</b><br><sub>wakes up the slow way: yawn, stretch, sit</sub><br><img src="docs/assets/states/wake.gif" width="240"></td>
-<td align="center"><b>you're needed</b><br><sub>rears up with a meow (+ terminal bell)</sub><br><img src="docs/assets/states/alert.gif" width="240"></td>
-<td align="center"><b>steps aside</b><br><sub>walks off — an empty screen means it's your turn</sub><br><img src="docs/assets/states/leave.gif" width="240"></td>
+<td align="center"><b>you're needed</b><br><sub>rears up with a meow (+ terminal bell), then sits back down</sub><br><img src="docs/assets/states/alert.gif" width="240"></td>
+<td align="center"><b>task done</b><br><sub>quietly gets up and walks off — the cat leaving is the done signal</sub><br><img src="docs/assets/states/leave.gif" width="240"></td>
 </tr>
 </table>
 

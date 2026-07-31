@@ -5,9 +5,10 @@
 **あなたの代わりに AI エージェントの面倒を見る猫。**
 
 Claude が作業している間、本物の子猫がターミナルの上に座って見守ります。<br>
-あなたの出番になった瞬間 — 権限確認、質問、完了 — 立ち上がって鳴き、道を譲ります。
+あなたの出番になった瞬間、立ち上がって一声鳴き、また隣に座ります。<br>
+タスクが終わると静かに歩き去ります — 猫がいなくなったら完了の合図です。
 
-<img src="docs/assets/demo.gif" alt="catsit デモ: 本物の白い子猫がターミナルに歩いて入り、Claude Code の作業中は座って待ち、権限プロンプトが出ると立ち上がって鳴き、歩き去る" width="720">
+<img src="docs/assets/demo.gif" alt="catsit デモ: 本物の白い子猫がターミナルに歩いて入り、Claude Code の作業中は座って待ち、昼寝をし、権限プロンプトが出ると立ち上がって鳴いてまた座り、タスクが終わると歩き去る" width="720">
 
 <sub>一匹の連続ワンテイク — スプライトではありません（作り方はクレジット参照）。デフォルトでは入力に一切触れず、<code>--guard</code> はオプトインです。</sub>
 
@@ -29,8 +30,8 @@ Claude が作業している間、本物の子猫がターミナルの上に座�
 </tr>
 <tr>
 <td align="center"><b>キーに触れると</b><br><sub>ゆっくり目覚めます：あくび、伸び、座り直し</sub><br><img src="docs/assets/states/wake.gif" width="240"></td>
-<td align="center"><b>あなたの出番</b><br><sub>立ち上がって鳴く（+ ターミナルベル）</sub><br><img src="docs/assets/states/alert.gif" width="240"></td>
-<td align="center"><b>道を譲る</b><br><sub>歩き去る — 画面が空いたらあなたの番</sub><br><img src="docs/assets/states/leave.gif" width="240"></td>
+<td align="center"><b>あなたの出番</b><br><sub>立ち上がって鳴き（+ ターミナルベル）、また座る</sub><br><img src="docs/assets/states/alert.gif" width="240"></td>
+<td align="center"><b>タスク完了</b><br><sub>静かに立って歩き去る — 猫の退場が完了の合図</sub><br><img src="docs/assets/states/leave.gif" width="240"></td>
 </tr>
 </table>
 

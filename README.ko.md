@@ -5,9 +5,10 @@
 **당신 대신 AI 에이전트를 봐주는 고양이.**
 
 Claude가 일하는 동안 진짜 아기 고양이가 터미널 위에 앉아 지켜봅니다.<br>
-당신이 필요해지는 순간 — 권한 요청, 질문, 완료 — 벌떡 일어서서 야옹하고 비켜줍니다.
+당신이 필요해지는 순간 벌떡 일어서서 야옹 한 번, 그리고 다시 곁에 앉습니다.<br>
+작업이 끝나면 조용히 일어나 걸어 나갑니다 — 고양이가 떠나는 게 완료 신호입니다.
 
-<img src="docs/assets/demo.gif" alt="catsit 데모: 진짜 흰 아기 고양이가 터미널로 걸어 들어와 Claude Code가 일하는 동안 앉아 기다리다, 권한 프롬프트가 뜨면 벌떡 일어서서 야옹하고 걸어 나간다" width="720">
+<img src="docs/assets/demo.gif" alt="catsit 데모: 진짜 흰 아기 고양이가 터미널로 걸어 들어와 Claude Code가 일하는 동안 앉아 기다리다 낮잠을 자고, 권한 프롬프트가 뜨면 벌떡 일어서서 야옹한 뒤 다시 앉고, 작업이 끝나면 걸어 나간다" width="720">
 
 <sub>한 마리의 연속 원테이크 — 스프라이트가 아닙니다 (만든 방법은 FAQ에). 기본값에서는 입력을 절대 건드리지 않으며 <code>--guard</code>는 옵트인입니다.</sub>
 
@@ -29,8 +30,8 @@ Claude가 일하는 동안 진짜 아기 고양이가 터미널 위에 앉아 �
 </tr>
 <tr>
 <td align="center"><b>키를 건드리면</b><br><sub>부스스 일어납니다: 하품, 기지개, 다시 앉기</sub><br><img src="docs/assets/states/wake.gif" width="240"></td>
-<td align="center"><b>당신이 필요해지면</b><br><sub>벌떡 일어서서 야옹 (+ 터미널 벨)</sub><br><img src="docs/assets/states/alert.gif" width="240"></td>
-<td align="center"><b>비켜줍니다</b><br><sub>걸어 나감 — 화면이 비면 당신 차례</sub><br><img src="docs/assets/states/leave.gif" width="240"></td>
+<td align="center"><b>당신이 필요해지면</b><br><sub>벌떡 일어서서 야옹 (+ 터미널 벨), 그리고 다시 앉음</sub><br><img src="docs/assets/states/alert.gif" width="240"></td>
+<td align="center"><b>작업 완료</b><br><sub>조용히 일어나 걸어 나감 — 고양이가 떠나면 끝난 것</sub><br><img src="docs/assets/states/leave.gif" width="240"></td>
 </tr>
 </table>
 

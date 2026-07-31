@@ -5,9 +5,10 @@
 **替你看管 AI 编程智能体的猫。**
 
 Claude 工作时，一只真实的小猫坐在你的终端上守望。<br>
-需要你的那一刻 —— 权限确认、提问、完成 —— 它直立起身喵一声，让开位置。
+需要你的那一刻，它直立起身喵一声，然后重新坐回你身旁。<br>
+任务完成时它悄悄起身走开 —— 小猫离场就是完成的信号。
 
-<img src="docs/assets/demo.gif" alt="catsit 演示：一只真实的白色小猫走进终端，在 Claude Code 工作时坐着等待；权限提示出现时它直立起身喵叫，然后走开" width="720">
+<img src="docs/assets/demo.gif" alt="catsit 演示：一只真实的白色小猫走进终端，在 Claude Code 工作时坐着等待、打盹；权限提示出现时它直立起身喵叫后重新坐下，任务完成后起身走开" width="720">
 
 <sub>同一只猫的连续一镜到底 —— 不是精灵图（制作方式见致谢）。默认情况下 catsit 绝不碰你的输入，<code>--guard</code> 为可选项。</sub>
 
@@ -29,8 +30,8 @@ Claude 工作时，一只真实的小猫坐在你的终端上守望。<br>
 </tr>
 <tr>
 <td align="center"><b>你碰了键盘</b><br><sub>慢悠悠醒来：打哈欠、伸懒腰、坐好</sub><br><img src="docs/assets/states/wake.gif" width="240"></td>
-<td align="center"><b>需要你了</b><br><sub>直立起身喵叫（+ 终端铃声）</sub><br><img src="docs/assets/states/alert.gif" width="240"></td>
-<td align="center"><b>让开位置</b><br><sub>走出画面 —— 屏幕空了就轮到你</sub><br><img src="docs/assets/states/leave.gif" width="240"></td>
+<td align="center"><b>需要你了</b><br><sub>直立起身喵叫（+ 终端铃声），然后重新坐下</sub><br><img src="docs/assets/states/alert.gif" width="240"></td>
+<td align="center"><b>任务完成</b><br><sub>悄悄起身走出画面 —— 小猫离场就是完成信号</sub><br><img src="docs/assets/states/leave.gif" width="240"></td>
 </tr>
 </table>
 
