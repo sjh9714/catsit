@@ -298,6 +298,10 @@ describe("CatAnimator appear delay", () => {
     now += APPEAR_DELAY_MS;
     await tickN(102); // seated
     animator.onState({ kind: "needs_human", reason: "permission" });
+    const meowTicks = () => (animator as unknown as { meowUntilTick: number }).meowUntilTick;
+    expect(meowTicks()).toBeGreaterThan(0); // the call cries out
+    animator.onState({ kind: "needs_human", reason: "question" });
+    expect(beat().beat).toBe("alertUp"); // reason flicker: same prompt, no re-alert
     await tickN(51); // rear-up meow plays out with no answer
     expect(beat().beat).toBe("alertUp");
     expect(beat().reverse).toBe(true); // settles back down…
@@ -307,6 +311,7 @@ describe("CatAnimator appear delay", () => {
     await tickN(60);
     expect(beat().beat).toBe("idle"); // but never dozes off while you're needed
     animator.onState({ kind: "needs_human", reason: "done" }); // you answered; task finished
+    expect(meowTicks()).toBe(0); // the goodbye is silent — one meow per visit
     await tickN(51);
     expect(beat().beat).toBe("walkOut"); // the goodbye
     await tickN(51);

@@ -90,9 +90,21 @@ export class CatAnimator {
 
   onState(next: CatState): void {
     if (this.stopped) return;
+    const prev = this.lastState;
     this.lastState = next;
     const a = this.anim;
     this.opts.log?.(`anim<-state ${next.kind}${"reason" in next ? ":" + next.reason : ""} (anim=${a.kind === "beat" ? a.beat : a.kind})`);
+    // the same unanswered prompt re-read as another reason (permission ↔
+    // question flicker) is not a new event — no second bell, no re-alert
+    if (
+      next.kind === "needs_human" &&
+      next.reason !== "done" &&
+      prev.kind === "needs_human" &&
+      a.kind === "beat" &&
+      (a.beat === "idle" || a.beat === "alertUp")
+    ) {
+      return;
+    }
     switch (next.kind) {
       case "working":
         if (a.kind === "hidden") this.anim = { kind: "waiting", since: this.now() };
@@ -121,11 +133,11 @@ export class CatAnimator {
           } else if (a.beat === "walkIn" || a.beat === "sitDown") {
             // still arriving: meow right away, finish the entrance connected,
             // then do the rear-up once seated (no jump cuts)
-            this.meowUntilTick = MEOW_HOLD_TICKS;
+            this.meow();
             this.pendingAlert = true;
           } else {
             this.anim = { kind: "beat", beat: "alertUp", ticks: 0 };
-            this.meowUntilTick = MEOW_HOLD_TICKS;
+            this.meow();
           }
           this.render();
         }
@@ -182,6 +194,14 @@ export class CatAnimator {
   private hintText = " guarding · ctrl+g to shoo";
   private tierHintShown = false;
   private meowUntilTick = 0; // counts down while alertUp plays
+  private meowedThisVisit = false; // one meow bubble per visit — the first
+  //   call cries out; the goodbye rear-up is silent (the bell still rings)
+
+  private meow(): void {
+    if (this.meowedThisVisit) return;
+    this.meowedThisVisit = true;
+    this.meowUntilTick = MEOW_HOLD_TICKS;
+  }
 
   /** A keypress was swallowed — show what was eaten. */
   onSwallow(text = ""): void {
@@ -224,8 +244,10 @@ export class CatAnimator {
       case "hidden":
         return;
       case "waiting":
-        if (t - this.anim.since >= APPEAR_DELAY_MS) this.anim = { kind: "beat", beat: "walkIn", ticks: 0 };
-        else return;
+        if (t - this.anim.since >= APPEAR_DELAY_MS) {
+          this.meowedThisVisit = false; // a fresh visit gets a fresh voice
+          this.anim = { kind: "beat", beat: "walkIn", ticks: 0 };
+        } else return;
         break;
       case "beat": {
         this.anim.ticks++;
@@ -262,7 +284,7 @@ export class CatAnimator {
             this.pendingWake = false;
             if (next === "alertUp" && !reverse) {
               this.pendingAlert = false;
-              this.meowUntilTick = MEOW_HOLD_TICKS;
+              this.meow();
             }
             // the nap timer runs from the user's last input on purpose: if
             // you've been away all along, the cat settles and naps soon after
