@@ -206,13 +206,15 @@ describe("CatAnimator appear delay", () => {
     expect(beat().beat).toBe("walkIn"); // entrance stays connected
     await tickN(41 + 50); // finish walkIn + sitDown
     expect(beat().beat).toBe("alertUp"); // then the rear-up plays
-    await tickN(51); // a prompt is a call, not a goodbye: settle and wait
+    await tickN(51); // a prompt is a call, not a goodbye: hold the watch
     expect(beat().beat).toBe("alertUp");
-    expect((beat() as { reverse?: boolean }).reverse).toBe(true);
+    expect((beat() as { reverse?: boolean }).reverse).toBeFalsy();
+    await tickN(40);
+    expect(beat().beat).toBe("alertUp"); // still standing, still yours to answer
     animator.stop();
   });
 
-  it("answered before the meow ends: rears back down in place, no exit", async () => {
+  it("answered: holds the watch, then quietly settles — never a second cry", async () => {
     const animator = new CatAnimator({
       compositor: comp,
       mirror: comp.screen,
@@ -237,9 +239,12 @@ describe("CatAnimator appear delay", () => {
     expect(beat().beat).toBe("alertUp");
     animator.onState({ kind: "working" }); // you hit "yes" — agent resumes
     await tickN(41); // the rear-up finishes...
-    expect(beat().beat).toBe("alertUp"); // ...and plays again backwards
-    expect(beat().reverse).toBe(true);
+    expect(beat().beat).toBe("alertUp"); // ...and HOLDS the standing watch
+    expect(beat().reverse).toBeFalsy();
     expect(animator.isVisible).toBe(true); // never leaves the screen
+    await tickN(55); // the agent stays busy a while → quiet settle begins
+    expect(beat().beat).toBe("alertUp");
+    expect(beat().reverse).toBe(true);
     await tickN(51); // rear-down lands on the sitting anchor
     expect(beat().beat).toBe("idle");
     animator.stop();
@@ -277,7 +282,7 @@ describe("CatAnimator appear delay", () => {
     animator.stop();
   });
 
-  it("an unanswered prompt: meow, settle, wait — then leave only on done", async () => {
+  it("an unanswered prompt: one meow, hold the watch — leave only on done", async () => {
     const animator = new CatAnimator({
       compositor: comp,
       mirror: comp.screen,
@@ -304,16 +309,14 @@ describe("CatAnimator appear delay", () => {
     expect(beat().beat).toBe("alertUp"); // reason flicker: same prompt, no re-alert
     await tickN(51); // rear-up meow plays out with no answer
     expect(beat().beat).toBe("alertUp");
-    expect(beat().reverse).toBe(true); // settles back down…
-    await tickN(51);
-    expect(beat().beat).toBe("idle"); // …and keeps you company
+    expect(beat().reverse).toBeFalsy(); // …and holds the standing watch
     now += SLEEP_AFTER_MS + 60_000;
     await tickN(60);
-    expect(beat().beat).toBe("idle"); // but never dozes off while you're needed
+    expect(beat().beat).toBe("alertUp"); // no settling, no dozing — you're needed
     animator.onState({ kind: "needs_human", reason: "done" }); // you answered; task finished
     expect(meowTicks()).toBe(0); // the goodbye is silent — one meow per visit
-    await tickN(51);
-    expect(beat().beat).toBe("walkOut"); // the goodbye
+    await tickN(2);
+    expect(beat().beat).toBe("walkOut"); // straight off from the held pose
     await tickN(51);
     expect(animator.isVisible).toBe(false);
     expect(diffScreens(comp.screen, user)).toEqual([]);

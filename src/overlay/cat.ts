@@ -39,7 +39,8 @@ const NEXT_BEAT: Partial<Record<BeatName, BeatName>> = {
   sitDown: "idle",
   sleepDown: "sleepLoop",
   wakeUp: "alertUp", // overridden to walkOut when the cat was shooed awake
-  alertUp: "walkOut",
+  // alertUp has no default: the rear-up ends in a HELD standing watch, and
+  // tick() decides between holding, settling back, and the goodbye walk-off
 };
 
 // fallback-tier pose for each beat (pixel cat has no filmed transitions)
@@ -117,7 +118,11 @@ export class CatAnimator {
           // the turn ended before the cat ever appeared: stay silent — the
           // user was never told to look away, so no meow is owed
           this.anim = { kind: "hidden" };
-        } else if (a.kind === "beat" && (a.beat !== "alertUp" || a.reverse) && a.beat !== "walkOut") {
+        } else if (a.kind === "beat" && a.beat === "alertUp" && !a.reverse) {
+          // mid-meow or holding the watch: ring the bell for a finished task;
+          // tick() starts the walk-off as soon as the rear-up is done
+          if (next.reason === "done") this.opts.bell();
+        } else if (a.kind === "beat" && a.beat !== "walkOut") {
           this.opts.bell(); // the gate is already open; the bell never waits
           if (a.beat === "alertUp") {
             // mid rear-down: finish settling, then rear right back up
@@ -164,6 +169,7 @@ export class CatAnimator {
   private pendingWake = false;
   private pendingAlert = false; // needs_human arrived mid-entrance
   private wakeTarget: BeatName = "idle";
+  private holdTicks = 0; // how long the standing watch has seen the agent work
 
   /** Any user input byte (keys, mouse reports). Wakes a sleeping cat. */
   onUserActivity(): void {
@@ -268,17 +274,23 @@ export class CatAnimator {
           else if (this.anim.beat === "wakeUp") next = this.wakeTarget;
           else if (this.anim.beat === "sitDown" && this.pendingAlert) next = "alertUp";
           else if (this.anim.beat === "alertUp" && this.anim.reverse) next = this.pendingAlert ? "alertUp" : "idle";
-          else if (
-            this.anim.beat === "alertUp" &&
-            (this.lastState.kind === "working" ||
-              (this.lastState.kind === "needs_human" && this.lastState.reason !== "done"))
-          ) {
-            // a mid-task meow (prompt, question) is a call, not a goodbye:
-            // rear back down (the same beat backwards, landing on the sitting
-            // anchor) and keep the user company until it's answered. Only a
-            // finished task — or a shoo — ends in the walk-off.
-            next = "alertUp";
-            reverse = true;
+          else if (this.anim.beat === "alertUp") {
+            // the rear-up plays ONCE, then the cat holds the standing watch —
+            // no repeated crying theater. From the held pose: a finished task
+            // walks straight off (walkOut chains from this exact frame), and
+            // an answered prompt settles back down only after the agent has
+            // been working a while (so the settle never reads as a second cry)
+            if (this.lastState.kind === "needs_human" && this.lastState.reason === "done") {
+              next = "walkOut";
+              this.holdTicks = 0;
+            } else if (this.lastState.kind === "working" && ++this.holdTicks >= 50) {
+              next = "alertUp";
+              reverse = true;
+              this.holdTicks = 0;
+            } else {
+              if (this.lastState.kind !== "working") this.holdTicks = 0;
+              next = undefined; // hold: stay standing, eyes on you
+            }
           }
           if (next) {
             this.pendingWake = false;
