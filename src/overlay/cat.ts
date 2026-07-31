@@ -64,6 +64,7 @@ export class CatAnimator {
       bell: () => void;
       now?: () => number;
       log?: (msg: string) => void;
+      sleepAfterMs?: number; // override (the demo naps sooner, for show)
     },
   ) {
     this.lastActivityAt = this.now(); // launching catsit counts as activity
@@ -225,7 +226,7 @@ export class CatAnimator {
         if (
           this.anim.beat === "idle" &&
           this.anim.ticks >= 50 && // settle in for at least 5s before napping
-          t - this.lastActivityAt >= SLEEP_AFTER_MS // …counted from YOUR last key
+          t - this.lastActivityAt >= (this.opts.sleepAfterMs ?? SLEEP_AFTER_MS) // …from YOUR last key
         ) {
           this.pendingWake = false;
           this.wakeTarget = "idle";
