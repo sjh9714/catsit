@@ -22,13 +22,15 @@ export type FrameName =
   | "gulp"
   | "alert"
   | "walk1"
-  | "walk2";
+  | "walk2"
+  | "walkE1" // walking right (leaving); tiers without directional art reuse walk1/2
+  | "walkE2";
 
 export const FRAME_W = 26;
 export const FRAME_H = 14;
 
 // prettier-ignore
-export const FRAMES: Record<FrameName, string[]> = {
+const _FRAMES_BASE = {
   loaf1: [
     "..........................",
     "...kk....kk...............",
@@ -173,6 +175,12 @@ export const FRAMES: Record<FrameName, string[]> = {
     "..kwk..kkk....kkk..kkk....",
     "..ww...www....kkk...kk....",
   ],
+};
+
+export const FRAMES: Record<FrameName, string[]> = {
+  ..._FRAMES_BASE,
+  walkE1: _FRAMES_BASE.walk1,
+  walkE2: _FRAMES_BASE.walk2,
 };
 
 const RIM: [number, number, number] = [104, 104, 122]; // silhouette rim so a

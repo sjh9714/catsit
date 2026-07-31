@@ -5,7 +5,7 @@
 import type { Compositor, Overlay } from "../compositor.js";
 import type { Mirror } from "../mirror.js";
 import type { CatState } from "../state.js";
-import { CAT_COLS, CAT_ROWS, clipColumns, SpriteRenderer } from "./render.js";
+import { clipColumns, SpriteRenderer } from "./render.js";
 import type { FrameName } from "./sprites.js";
 
 type Anim =
@@ -179,8 +179,9 @@ export class CatAnimator {
   private frameFor(t: number): FrameName {
     switch (this.anim.kind) {
       case "walk-in":
-      case "walk-out":
         return this.tickNo % 2 ? "walk1" : "walk2";
+      case "walk-out":
+        return this.tickNo % 2 ? "walkE1" : "walkE2";
       case "flick":
         return "flick";
       case "gulp":
@@ -198,13 +199,14 @@ export class CatAnimator {
 
   /** Cat x offset: walks in from the right edge to the anchor. */
   private xOffset(cols: number): number {
-    const anchorX = Math.max(0, cols - CAT_COLS - 2);
+    const catCols = this.opts.renderer.catCols;
+    const anchorX = Math.max(0, cols - catCols - 2);
     if (this.anim.kind === "walk-in") {
       const remaining = WALK_STEPS - this.anim.step;
-      return anchorX + Math.round(((CAT_COLS + 2) * remaining) / WALK_STEPS);
+      return anchorX + Math.round(((catCols + 2) * remaining) / WALK_STEPS);
     }
     if (this.anim.kind === "walk-out") {
-      return anchorX + Math.round(((CAT_COLS + 2) * this.anim.step) / WALK_STEPS);
+      return anchorX + Math.round(((catCols + 2) * this.anim.step) / WALK_STEPS);
     }
     return anchorX;
   }
@@ -220,10 +222,10 @@ export class CatAnimator {
       if (/^─+$/.test(text) || /^╭─+╮?$/.test(text)) {
         // found a border; the box top is above it — sit on top of the box
         const top = Math.min(y, rows - 1);
-        return Math.max(0, top - CAT_ROWS - 3);
+        return Math.max(0, top - this.opts.renderer.catRows - 3);
       }
     }
-    return Math.max(0, rows - CAT_ROWS - 5);
+    return Math.max(0, rows - this.opts.renderer.catRows - 5);
   }
 
   // One persistent overlay object whose draw parameters mutate: the
@@ -254,8 +256,8 @@ export class CatAnimator {
       rect: () => ({
         x: cur.cellX - 8,
         y: cur.cellY - 1,
-        w: CAT_COLS + 10,
-        h: CAT_ROWS + 2,
+        w: renderer.catCols + 10,
+        h: renderer.catRows + 2,
       }),
       draw: (cols, rows) => {
         let s = renderer.draw({ frame: cur.frame, cellX: cur.cellX, cellY: cur.cellY, cols, rows });
@@ -268,9 +270,9 @@ export class CatAnimator {
           s += `\x1b[${bubbleRow};${bx + 1}H\x1b[0;${renderer.fg(30, 30, 30)};${renderer.bg(255, 220, 120)}m 🐟 ${clipColumns(cur.bubble, 8)} \x1b[0m`;
         }
         if (cur.hint) {
-          const hintRow = cur.cellY + CAT_ROWS + 1; // 1-based; last row of the rect
+          const hintRow = cur.cellY + renderer.catRows + 1; // 1-based; last row of the rect
           if (hintRow >= 1 && hintRow <= rows) {
-            s += `\x1b[${hintRow};${bx + 1}H\x1b[0;2m${clipColumns(" cat is guarding · ctrl+g to shoo", CAT_COLS + 9)}\x1b[0m`;
+            s += `\x1b[${hintRow};${bx + 1}H\x1b[0;2m${clipColumns(" guarding · ctrl+g to shoo", renderer.catCols + 9)}\x1b[0m`;
           }
         }
         return s;
