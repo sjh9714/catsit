@@ -65,7 +65,9 @@ export class CatAnimator {
       now?: () => number;
       log?: (msg: string) => void;
     },
-  ) {}
+  ) {
+    this.lastActivityAt = this.now(); // launching catsit counts as activity
+  }
 
   start(): void {
     this.timer = setInterval(() => this.tick(), TICK_MS);
@@ -217,7 +219,11 @@ export class CatAnimator {
       case "beat": {
         this.anim.ticks++;
         if (this.meowUntilTick > 0) this.meowUntilTick--;
-        if (this.anim.beat === "idle" && t - this.lastActivityAt >= SLEEP_AFTER_MS) {
+        if (
+          this.anim.beat === "idle" &&
+          this.anim.ticks >= 50 && // settle in for at least 5s before napping
+          t - this.lastActivityAt >= SLEEP_AFTER_MS // …counted from YOUR last key
+        ) {
           this.pendingWake = false;
           this.wakeTarget = "idle";
           this.anim = { kind: "beat", beat: "sleepDown", ticks: 0 };
@@ -232,7 +238,8 @@ export class CatAnimator {
               this.pendingAlert = false;
               this.meowUntilTick = MEOW_HOLD_TICKS;
             }
-            if (next === "idle") this.lastActivityAt = t; // a fresh 60s before napping
+            // the nap timer runs from the user's last input on purpose: if
+            // you've been away all along, the cat settles and naps soon after
             this.anim = { kind: "beat", beat: next, ticks: 0 };
           } else if (this.anim.beat === "walkOut") {
             this.anim = { kind: "hidden" };

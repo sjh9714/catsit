@@ -146,9 +146,10 @@ describe("CatAnimator appear delay", () => {
     await tickN(50 + 50 + 2); // real beat lengths: walkIn + sitDown + idle
     expect(beat().beat).toBe("idle");
 
-    // 60s of quiet → the cat curls up and naps
+    // 60s since YOUR last input → the cat curls up and naps
+    // (it still settles in for a 5s grace after sitting down)
     now += SLEEP_AFTER_MS;
-    await tickN(1);
+    await tickN(51);
     expect(beat().beat).toBe("sleepDown");
     await tickN(50);
     expect(beat().beat).toBe("sleepLoop");
@@ -161,7 +162,7 @@ describe("CatAnimator appear delay", () => {
 
     // quiet again → asleep again; this time the agent needs a human
     now += SLEEP_AFTER_MS;
-    await tickN(52);
+    await tickN(102);
     expect(beat().beat).toBe("sleepLoop");
     let bells = 0;
     (animator as unknown as { opts: { bell: () => void } }).opts.bell = () => bells++;
