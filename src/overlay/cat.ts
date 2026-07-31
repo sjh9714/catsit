@@ -283,7 +283,7 @@ export class CatAnimator {
             if (this.lastState.kind === "needs_human" && this.lastState.reason === "done") {
               next = "walkOut";
               this.holdTicks = 0;
-            } else if (this.lastState.kind === "working" && ++this.holdTicks >= 50) {
+            } else if (this.lastState.kind === "working" && ++this.holdTicks >= 30) {
               next = "alertUp";
               reverse = true;
               this.holdTicks = 0;

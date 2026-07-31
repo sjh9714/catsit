@@ -50,6 +50,14 @@ export class StateMachine {
       case "idle":
         if (this.current.kind === "working") {
           this.transition({ kind: "needs_human", reason: "done" });
+        } else if (
+          this.current.kind === "needs_human" &&
+          (this.current.reason === "permission" || this.current.reason === "question")
+        ) {
+          // the prompt left the screen with no busy phase in between: it was
+          // answered and the turn is already over — never leave the cat
+          // standing watch over a finished task
+          this.transition({ kind: "needs_human", reason: "done" });
         }
         break;
       case "unknown":

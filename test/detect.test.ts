@@ -209,6 +209,16 @@ describe("StateMachine fusion", () => {
     expect(sm.state).toEqual({ kind: "needs_human", reason: "permission" });
   });
 
+  it("an answered prompt that jumps straight to idle resolves to done", () => {
+    // yes → the turn finishes before any busy screen is ever detected; the
+    // cat must not be left standing watch over a finished task
+    const sm = new StateMachine();
+    sm.updateFromScreen("busy");
+    sm.updateFromScreen("waiting_input");
+    sm.updateFromScreen("idle");
+    expect(sm.state).toEqual({ kind: "needs_human", reason: "done" });
+  });
+
   it("unknown screen keeps current belief", () => {
     const sm = new StateMachine();
     sm.updateFromScreen("busy");
