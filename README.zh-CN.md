@@ -63,6 +63,23 @@ catsit 把通知反转过来。猫的**存在本身**就是信号：
   猫没了，会话还在。
 - `ctrl+g` 把猫赶走（本次会话内）。
 
+## 猫的一天
+
+同一只猫的连续表演 —— 每个转场都无缝衔接。
+
+<table>
+<tr>
+<td align="center" width="33%"><b>智能体开始工作</b><br><sub>走进来，安顿下来</sub><br><img src="docs/assets/states/arrive.gif" width="270"></td>
+<td align="center" width="33%"><b>工作中</b><br><sub>坐着等待 —— 猫安静说明不需要你</sub><br><img src="docs/assets/states/idle.gif" width="270"></td>
+<td align="center" width="33%"><b>60 秒无输入</b><br><sub>蜷成一团打盹</sub><br><img src="docs/assets/states/sleep.gif" width="270"></td>
+</tr>
+<tr>
+<td align="center"><b>你碰了键盘</b><br><sub>慢悠悠醒来：打哈欠、伸懒腰、坐好</sub><br><img src="docs/assets/states/wake.gif" width="270"></td>
+<td align="center"><b>需要你了</b><br><sub>直立起身喵叫（+ 终端铃声）</sub><br><img src="docs/assets/states/alert.gif" width="270"></td>
+<td align="center"><b>让开位置</b><br><sub>走出画面 —— 屏幕空了就轮到你</sub><br><img src="docs/assets/states/leave.gif" width="270"></td>
+</tr>
+</table>
+
 ## 各终端下的效果
 
 | 终端 | 效果 |

@@ -66,6 +66,23 @@ catsit は通知を反転させます。猫の**存在そのもの**がシグナ
   永久降格 — 猫は消えてもセッションは生き続けます。
 - `ctrl+g` で猫を追い払えます（セッション中）。
 
+## 猫の一日
+
+一匹の連続した演技 — すべての遷移がつながっています。
+
+<table>
+<tr>
+<td align="center" width="33%"><b>エージェントが作業開始</b><br><sub>歩いて入り、腰を落ち着けます</sub><br><img src="docs/assets/states/arrive.gif" width="270"></td>
+<td align="center" width="33%"><b>作業中</b><br><sub>座って待つ — 猫が穏やかなら出番なし</sub><br><img src="docs/assets/states/idle.gif" width="270"></td>
+<td align="center" width="33%"><b>60秒間入力がないと</b><br><sub>丸くなって昼寝</sub><br><img src="docs/assets/states/sleep.gif" width="270"></td>
+</tr>
+<tr>
+<td align="center"><b>キーに触れると</b><br><sub>ゆっくり目覚めます：あくび、伸び、座り直し</sub><br><img src="docs/assets/states/wake.gif" width="270"></td>
+<td align="center"><b>あなたの出番</b><br><sub>立ち上がって鳴く（+ ターミナルベル）</sub><br><img src="docs/assets/states/alert.gif" width="270"></td>
+<td align="center"><b>道を譲る</b><br><sub>歩き去る — 画面が空いたらあなたの番</sub><br><img src="docs/assets/states/leave.gif" width="270"></td>
+</tr>
+</table>
+
 ## ターミナル別の見え方
 
 | ターミナル | 表示 |
