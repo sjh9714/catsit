@@ -6,8 +6,7 @@
 // All modes draw the same frame geometry: FRAME_W cols × FRAME_H/2 rows.
 
 import { FRAME_H, FRAME_W, framePixels, type FrameName } from "./sprites.js";
-import { encodePNG } from "./png.js";
-import { ONEKO, ONEKO_TILE, type OnekoPose } from "./oneko.js";
+import { loadVideoFrames, type FrameSetName, type VideoFrames } from "./frames.js";
 
 export type RenderMode = "kitty" | "half" | "kaomoji";
 
@@ -16,54 +15,19 @@ export const CAT_ROWS = FRAME_H / 2;
 
 const KITTY_IMG_BASE = 4200; // arbitrary id namespace for catsit
 
-// kitty tier shows the 1989 oneko cat (public domain, Kenji Gotoh) — a plain
-// cat, not a mascot. Square 32px art → 16×8 cells (cells are ~1:2).
-export const ONEKO_COLS = 16;
-export const ONEKO_ROWS = 8;
-const ONEKO_SCALE = 10; // 320×320 transmitted pixels, nearest-neighbor crisp
+// kitty tier shows the living cat: real-photo video frames advancing at the
+// animator's tick rate. Cells are ~1:2; every set's canvas is 256px tall and
+// bottom-anchored, so cols = round(aspect * rows * 2) keeps proportions and
+// the walking cat's feet stay on the sitting cat's baseline.
+export const VIDEO_ROWS = 9;
+export const VIDEO_COLS = 13; // idle 190×256
+export const WALK_COLS = 29; // walk 420×256
 
-const ONEKO_MAP: Record<FrameName, OnekoPose> = {
-  loaf1: "idle",
-  loaf2: "idle",
-  sleep1: "sleep1",
-  sleep2: "sleep2",
-  flick: "scratch1",
-  gulp: "scratch2",
-  alert: "alert",
-  walk1: "runW1",
-  walk2: "runW2",
-  walkE1: "runE1",
-  walkE2: "runE2",
-};
-
-const ONEKO_INK: [number, number, number] = [20, 20, 24];
-const ONEKO_PAPER: [number, number, number] = [245, 245, 240];
-
-const onekoCache = new Map<OnekoPose, { w: number; h: number; px: Uint8Array }>();
-
-function onekoPixels(pose: OnekoPose): { w: number; h: number; px: Uint8Array } {
-  const hit = onekoCache.get(pose);
-  if (hit) return hit;
-  const rows = ONEKO[pose];
-  const w = ONEKO_TILE * ONEKO_SCALE;
-  const h = ONEKO_TILE * ONEKO_SCALE;
-  const px = new Uint8Array(w * h * 4);
-  for (let y = 0; y < h; y++) {
-    const row = rows[Math.floor(y / ONEKO_SCALE)] ?? "";
-    for (let x = 0; x < w; x++) {
-      const ch = row[Math.floor(x / ONEKO_SCALE)] ?? ".";
-      if (ch === ".") continue;
-      const c = ch === "k" ? ONEKO_INK : ONEKO_PAPER;
-      const i = (y * w + x) * 4;
-      px[i] = c[0];
-      px[i + 1] = c[1];
-      px[i + 2] = c[2];
-      px[i + 3] = 255;
-    }
-  }
-  const out = { w, h, px };
-  onekoCache.set(pose, out);
-  return out;
+/** Which frame set a sprite-frame name plays in the kitty tier. */
+function setFor(frame: FrameName): FrameSetName {
+  if (frame === "walk1" || frame === "walk2") return "walkL"; // entering: faces left
+  if (frame === "walkE1" || frame === "walkE2") return "walkR"; // leaving: faces right
+  return "idle";
 }
 
 export function detectRenderMode(env: NodeJS.ProcessEnv = process.env): RenderMode {
@@ -110,17 +74,18 @@ export interface DrawOpts {
   cellY: number;
   cols: number;
   rows: number;
+  vtick?: number; // animator tick counter; selects the video frame (kitty)
 }
 
 export class SpriteRenderer {
-  private b64Cache = new Map<OnekoPose, string>();
   // Single image id: frame changes RETRANSMIT data under the same id (the
   // active placement keeps showing, updated in place) and position changes
   // re-place the same placement id (atomic replace). No deletes during
   // animation — a delete/place pair leaves a window where the terminal can
   // composite a frame with no cat at all.
-  private lastPose: OnekoPose | null = null;
+  private lastVKey: string | null = null;
   private placed = false;
+  private frames: VideoFrames | null = null;
 
   constructor(
     private mode: RenderMode,
@@ -128,8 +93,14 @@ export class SpriteRenderer {
     private truecolor: boolean = detectTruecolor(),
   ) {
     if (mode === "kitty") {
-      for (const pose of Object.keys(ONEKO) as OnekoPose[]) onekoPixels(pose);
+      this.frames = loadVideoFrames(log);
+      if (!this.frames) this.mode = "half"; // broken install: degrade, never die
     }
+  }
+
+  /** True when frames advance every animator tick (kitty video tier). */
+  get animated(): boolean {
+    return this.mode === "kitty" && this.frames !== null;
   }
 
   get modeName(): RenderMode {
@@ -146,13 +117,18 @@ export class SpriteRenderer {
     return this.truecolor ? `48;2;${r};${g};${b}` : `48;5;${rgbTo256(r, g, b)}`;
   }
 
-  /** Cell footprint of the cat in this render mode. */
+  /** Cell footprint of the cat at rest in this render mode. */
   get catCols(): number {
-    return this.mode === "kitty" ? ONEKO_COLS : CAT_COLS;
+    return this.mode === "kitty" ? VIDEO_COLS : CAT_COLS;
   }
 
   get catRows(): number {
-    return this.mode === "kitty" ? ONEKO_ROWS : CAT_ROWS;
+    return this.mode === "kitty" ? VIDEO_ROWS : CAT_ROWS;
+  }
+
+  /** Widest cell footprint any frame set can paint (walk frames are wider). */
+  get maxCols(): number {
+    return this.mode === "kitty" ? WALK_COLS : CAT_COLS;
   }
 
   draw(o: DrawOpts): string {
@@ -165,7 +141,7 @@ export class SpriteRenderer {
   clear(): string {
     if (this.mode === "kitty" && this.placed) {
       this.placed = false;
-      this.lastPose = null; // force a retransmit on the next show
+      this.lastVKey = null; // force a retransmit on the next show
       this.log?.(`kitty clear i=${KITTY_IMG_BASE}`);
       return `\x1b_Ga=d,d=i,i=${KITTY_IMG_BASE},q=2\x1b\\`;
     }
@@ -173,35 +149,40 @@ export class SpriteRenderer {
   }
 
   // ------------------------------------------------------------- kitty ----
-  private frameB64(pose: OnekoPose): { b64: string; imgW: number } {
-    let b64 = this.b64Cache.get(pose);
-    const img = onekoPixels(pose); // cached after first render
-    if (b64 === undefined) {
-      b64 = encodePNG(img.w, img.h, img.px).toString("base64");
-      this.b64Cache.set(pose, b64);
-    }
-    return { b64, imgW: img.w };
-  }
-
   private drawKitty(o: DrawOpts): string {
-    const visCols = Math.min(this.catCols, o.cols - o.cellX);
-    this.log?.(`kitty draw f=${o.frame} x=${o.cellX} y=${o.cellY} vis=${visCols}`);
-    if (visCols <= 0) return this.clear();
+    const setName = setFor(o.frame);
+    const set = this.frames![setName];
+    const cols = Math.round((set.w / set.h) * this.catRows * 2);
+    // walk canvases are wider than the idle one; shift left so the cat's
+    // center stays on the idle cat's center
+    const cellX = o.cellX - Math.round((cols - this.catCols) / 2);
+    const visCols = Math.min(cols, o.cols - cellX);
+    if (visCols <= 0 || cellX + cols <= 0) return this.clear();
+    // vtick indexes the playback order deterministically, so app-repaint
+    // redraws between animator ticks replay the SAME frame (no fast-forward)
+    const idx = set.order[(o.vtick ?? 0) % set.order.length]!;
+    const vkey = `${setName}:${idx}`;
+    this.log?.(`kitty draw f=${o.frame} v=${vkey} x=${cellX} y=${o.cellY} vis=${visCols}`);
     let s = "";
-    const pose = ONEKO_MAP[o.frame];
-    const { b64, imgW } = this.frameB64(pose);
-    if (this.lastPose !== pose) {
+    if (this.lastVKey !== vkey) {
+      const b64 = set.b64[idx]!;
       const CHUNK = 4000;
       for (let i = 0; i < b64.length; i += CHUNK) {
         const last = i + CHUNK >= b64.length;
         const keys = i === 0 ? `a=t,f=100,t=d,i=${KITTY_IMG_BASE},q=2,m=${last ? 0 : 1}` : `m=${last ? 0 : 1}`;
         s += `\x1b_G${keys};${b64.slice(i, i + CHUNK)}\x1b\\`;
       }
-      this.lastPose = pose;
+      this.lastVKey = vkey;
     }
-    const srcW = Math.round((visCols / this.catCols) * imgW);
-    s += `\x1b[${o.cellY + 1};${o.cellX + 1}H`;
-    s += `\x1b_Ga=p,i=${KITTY_IMG_BASE},p=1,z=1,C=1,q=2,w=${srcW},c=${visCols},r=${this.catRows}\x1b\\`;
+    // clip on both edges: crop the source horizontally to the visible cells
+    const clipLeft = Math.max(0, -cellX);
+    const drawX = Math.max(0, cellX);
+    const drawCols = Math.min(cols - clipLeft, o.cols - drawX);
+    if (drawCols <= 0) return this.clear();
+    const srcX = Math.round((clipLeft / cols) * set.w);
+    const srcW = Math.round((drawCols / cols) * set.w);
+    s += `\x1b[${o.cellY + 1};${drawX + 1}H`;
+    s += `\x1b_Ga=p,i=${KITTY_IMG_BASE},p=1,z=1,C=1,q=2,x=${srcX},w=${srcW},c=${drawCols},r=${this.catRows}\x1b\\`;
     this.placed = true;
     return s;
   }

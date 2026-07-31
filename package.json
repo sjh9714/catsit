@@ -23,6 +23,7 @@
   },
   "files": [
     "dist",
+    "assets/cat-frames",
     "README.md",
     "README.ko.md",
     "README.ja.md",

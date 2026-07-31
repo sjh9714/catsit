@@ -19,8 +19,8 @@ type Anim =
   | { kind: "alert"; until: number }
   | { kind: "walk-out"; step: number };
 
-const TICK_MS = 200;
-const WALK_STEPS = 6;
+const TICK_MS = 100; // fast enough for the kitty video tier's 10fps frames
+const WALK_STEPS = 8;
 const SLEEP_AFTER_MS = 90_000;
 const MEOW_HOLD_MS = 1400;
 export const BUBBLE_HOLD_MS = 1400;
@@ -238,6 +238,7 @@ export class CatAnimator {
     showMeow: false,
     bubble: null as string | null,
     hint: false,
+    vtick: 0,
   };
   private overlayObj: Overlay | null = null;
   private lastRenderKey = "";
@@ -251,16 +252,18 @@ export class CatAnimator {
       get damagesCells() {
         return damages();
       },
-      // The rect must cover EVERYTHING draw() can paint — bubbles and the
-      // hint line included — or hiding the overlay leaves orphaned cells.
+      // The rect must cover EVERYTHING draw() can paint — bubbles, the hint
+      // line, and the wider walk frames — or hiding leaves orphaned cells.
+      // (maxCols ≥ catCols; walk canvases extend ~(maxCols-catCols)/2 ≤ 8
+      // cells left of cellX, inside the bubble margin.)
       rect: () => ({
         x: cur.cellX - 8,
         y: cur.cellY - 1,
-        w: renderer.catCols + 10,
+        w: renderer.maxCols + 10,
         h: renderer.catRows + 2,
       }),
       draw: (cols, rows) => {
-        let s = renderer.draw({ frame: cur.frame, cellX: cur.cellX, cellY: cur.cellY, cols, rows });
+        let s = renderer.draw({ frame: cur.frame, cellX: cur.cellX, cellY: cur.cellY, cols, rows, vtick: cur.vtick });
         const bubbleRow = Math.max(1, cur.cellY); // 1-based CUP row = 0-based cellY-1
         const bx = Math.max(0, cur.cellX - 8);
         if (cur.showMeow) {
@@ -291,7 +294,9 @@ export class CatAnimator {
     this.cur.showMeow = this.anim.kind === "alert";
     this.cur.bubble = t < this.bubbleUntil && !this.cur.showMeow ? this.bubbleText : null;
     this.cur.hint = t < this.hintUntil && !this.cur.showMeow;
-    const key = `${this.cur.frame}|${this.cur.cellX}|${this.cur.cellY}|${this.cur.showMeow}|${this.cur.bubble ?? ""}|${this.cur.hint}`;
+    // video tier: every tick is a new frame of the living cat
+    this.cur.vtick = this.opts.renderer.animated ? this.tickNo : 0;
+    const key = `${this.cur.frame}|${this.cur.cellX}|${this.cur.cellY}|${this.cur.showMeow}|${this.cur.bubble ?? ""}|${this.cur.hint}|${this.cur.vtick}`;
     if (key === this.lastRenderKey) return; // nothing changed; forwards keep it drawn
     this.lastRenderKey = key;
     this.opts.compositor.setOverlay(this.ensureOverlay());
