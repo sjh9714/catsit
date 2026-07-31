@@ -112,8 +112,8 @@ describe("CatAnimator appear delay", () => {
     });
     await feed("some app content\r\n");
     animator.onState({ kind: "working" });
-    // turn ends 2s later — before the appear delay elapses
-    now += 2000;
+    // turn ends before the appear delay elapses
+    now += APPEAR_DELAY_MS - 400;
     animator.tick();
     await pump();
     animator.onState({ kind: "needs_human", reason: "done" });
@@ -175,6 +175,38 @@ describe("CatAnimator appear delay", () => {
     await tickN(51);
     expect(animator.isVisible).toBe(false);
     expect(diffScreens(comp.screen, user)).toEqual([]);
+    animator.stop();
+  });
+
+  it("needs_human mid-entrance: bell and bubble now, rear-up once seated", async () => {
+    let bells = 0;
+    const animator = new CatAnimator({
+      compositor: comp,
+      mirror: comp.screen,
+      renderer: new SpriteRenderer("half"),
+      bell: () => bells++,
+      now: () => now,
+    });
+    const beat = () => (animator as unknown as { anim: { kind: string; beat?: string } }).anim;
+    const tickN = async (n: number) => {
+      for (let i = 0; i < n; i++) {
+        now += 200;
+        animator.tick();
+        await pump();
+      }
+    };
+    await feed("some app content\r\n");
+    animator.onState({ kind: "working" });
+    now += APPEAR_DELAY_MS;
+    await tickN(10); // mid walk-in
+    expect(beat().beat).toBe("walkIn");
+    animator.onState({ kind: "needs_human", reason: "permission" });
+    expect(bells).toBe(1); // notified immediately, no jump cut
+    expect(beat().beat).toBe("walkIn"); // entrance stays connected
+    await tickN(41 + 50); // finish walkIn + sitDown
+    expect(beat().beat).toBe("alertUp"); // then the rear-up plays
+    await tickN(51);
+    expect(beat().beat).toBe("walkOut");
     animator.stop();
   });
 

@@ -23,7 +23,9 @@ type Anim =
 const TICK_MS = 100;
 export const BUBBLE_HOLD_MS = 1400;
 export const HINT_HOLD_MS = 4000;
-export const APPEAR_DELAY_MS = 3500;
+// how long the agent must be working before the cat commits to walking in
+// (very short turns come and go catless); env override eases tuning
+export const APPEAR_DELAY_MS = Number(process.env["CATSIT_APPEAR_MS"]) || 1200;
 // no user activity this long → curls up (env override eases manual testing)
 export const SLEEP_AFTER_MS = Number(process.env["CATSIT_SLEEP_MS"]) || 60_000;
 const MEOW_HOLD_TICKS = 14; // bubble rides the alertUp beat this long
@@ -86,6 +88,7 @@ export class CatAnimator {
         if (a.kind === "hidden") this.anim = { kind: "waiting", since: this.now() };
         // mid-walkOut: let the cat finish leaving; the next tick sees state
         // "working" again via hidden→waiting and it walks right back in
+        this.pendingAlert = false; // the agent resumed; no alert theater owed
         break;
       case "needs_human":
         if (a.kind === "waiting") {
@@ -102,6 +105,11 @@ export class CatAnimator {
             this.pendingWake = true; // finish curling, then wake into the alert
           } else if (a.beat === "wakeUp") {
             this.wakeTarget = "alertUp";
+          } else if (a.beat === "walkIn" || a.beat === "sitDown") {
+            // still arriving: meow right away, finish the entrance connected,
+            // then do the rear-up once seated (no jump cuts)
+            this.meowUntilTick = MEOW_HOLD_TICKS;
+            this.pendingAlert = true;
           } else {
             this.anim = { kind: "beat", beat: "alertUp", ticks: 0 };
             this.meowUntilTick = MEOW_HOLD_TICKS;
@@ -129,6 +137,7 @@ export class CatAnimator {
   // and any keystroke (or mouse event reaching stdin) wakes it groggily
   private lastActivityAt = 0;
   private pendingWake = false;
+  private pendingAlert = false; // needs_human arrived mid-entrance
   private wakeTarget: BeatName = "idle";
 
   /** Any user input byte (keys, mouse reports). Wakes a sleeping cat. */
@@ -212,9 +221,13 @@ export class CatAnimator {
           let next = NEXT_BEAT[this.anim.beat];
           if (this.anim.beat === "sleepDown") next = this.pendingWake ? "wakeUp" : "sleepLoop";
           else if (this.anim.beat === "wakeUp") next = this.wakeTarget;
+          else if (this.anim.beat === "sitDown" && this.pendingAlert) next = "alertUp";
           if (next) {
             this.pendingWake = false;
-            if (next === "alertUp") this.meowUntilTick = MEOW_HOLD_TICKS;
+            if (next === "alertUp") {
+              this.pendingAlert = false;
+              this.meowUntilTick = MEOW_HOLD_TICKS;
+            }
             if (next === "idle") this.lastActivityAt = t; // a fresh 60s before napping
             this.anim = { kind: "beat", beat: next, ticks: 0 };
           } else if (this.anim.beat === "walkOut") {
@@ -322,7 +335,8 @@ export class CatAnimator {
     this.cur.frame = FALLBACK_FRAME[beat](ticks);
     this.cur.cellX = Math.max(0, this.opts.mirror.cols - this.opts.renderer.catCols - 1);
     this.cur.cellY = this.yAnchor(this.opts.mirror.rows);
-    this.cur.showMeow = beat === "alertUp" && this.meowUntilTick > 0;
+    this.cur.showMeow = this.meowUntilTick > 0; // rides the entrance too
+
     this.cur.bubble = t < this.bubbleUntil && !this.cur.showMeow ? this.bubbleText : null;
     this.cur.hint = t < this.hintUntil && !this.cur.showMeow;
     const frameIdx = this.opts.renderer.modeName === "kitty" ? this.opts.renderer.beatFrame(beat, ticks) : this.cur.frame;
