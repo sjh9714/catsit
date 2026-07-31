@@ -64,7 +64,8 @@ export async function runDemoAgent(): Promise<never> {
     await idle(2, "\x1b[2midle — the cat only guards while the agent works\x1b[0m");
     await busy(22, "refactoring src/auth.ts — guard mode: try typing, the cat swallows it");
     await permission(6);
-    await busy(6, "running the tests you approved");
-    await idle(4, "⏺ Done! All tests pass — the cat has stepped aside.");
+    await busy(5, "running the tests you approved");
+    // long enough for the cat's full goodbye: rear up, meow, walk off
+    await idle(13, "⏺ Done! All tests pass.");
   }
 }

@@ -160,19 +160,19 @@ describe("CatAnimator appear delay", () => {
     await tickN(51);
     expect(beat().beat).toBe("idle");
 
-    // quiet again → asleep again; this time the agent needs a human
+    // quiet again → asleep again; this time the task finishes
     now += SLEEP_AFTER_MS;
     await tickN(102);
     expect(beat().beat).toBe("sleepLoop");
     let bells = 0;
     (animator as unknown as { opts: { bell: () => void } }).opts.bell = () => bells++;
-    animator.onState({ kind: "needs_human", reason: "permission" });
+    animator.onState({ kind: "needs_human", reason: "done" });
     expect(bells).toBe(1); // the bell never waits for the animation
     expect(beat().beat).toBe("wakeUp");
     await tickN(51);
     expect(beat().beat).toBe("alertUp");
     await tickN(51);
-    expect(beat().beat).toBe("walkOut");
+    expect(beat().beat).toBe("walkOut"); // done → the goodbye walk-off
     await tickN(51);
     expect(animator.isVisible).toBe(false);
     expect(diffScreens(comp.screen, user)).toEqual([]);
@@ -206,8 +206,9 @@ describe("CatAnimator appear delay", () => {
     expect(beat().beat).toBe("walkIn"); // entrance stays connected
     await tickN(41 + 50); // finish walkIn + sitDown
     expect(beat().beat).toBe("alertUp"); // then the rear-up plays
-    await tickN(51);
-    expect(beat().beat).toBe("walkOut");
+    await tickN(51); // a prompt is a call, not a goodbye: settle and wait
+    expect(beat().beat).toBe("alertUp");
+    expect((beat() as { reverse?: boolean }).reverse).toBe(true);
     animator.stop();
   });
 
@@ -264,15 +265,53 @@ describe("CatAnimator appear delay", () => {
     animator.onState({ kind: "working" });
     now += APPEAR_DELAY_MS;
     await tickN(102); // seated
-    animator.onState({ kind: "needs_human", reason: "permission" });
-    await tickN(51); // the full rear-up plays out unanswered…
-    expect(beat().beat).toBe("walkOut"); // …so the cat starts stepping aside
-    animator.onState({ kind: "working" }); // answered only now, mid-exit
+    animator.onState({ kind: "needs_human", reason: "done" });
+    await tickN(51); // the goodbye rear-up plays out…
+    expect(beat().beat).toBe("walkOut"); // …and the cat starts stepping aside
+    animator.onState({ kind: "working" }); // you queued the next task mid-exit
     await tickN(51); // the walk-out finishes connected
     expect(beat().kind).toBe("waiting"); // NOT hidden: the cat owes a return
     now += APPEAR_DELAY_MS;
     await tickN(1);
     expect(beat().beat).toBe("walkIn"); // and walks right back in
+    animator.stop();
+  });
+
+  it("an unanswered prompt: meow, settle, wait — then leave only on done", async () => {
+    const animator = new CatAnimator({
+      compositor: comp,
+      mirror: comp.screen,
+      renderer: new SpriteRenderer("half"),
+      bell: () => {},
+      now: () => now,
+    });
+    const beat = () => (animator as unknown as { anim: { kind: string; beat?: string; reverse?: boolean } }).anim;
+    const tickN = async (n: number) => {
+      for (let i = 0; i < n; i++) {
+        now += 200;
+        animator.tick();
+        await pump();
+      }
+    };
+    await feed("some app content\r\n");
+    animator.onState({ kind: "working" });
+    now += APPEAR_DELAY_MS;
+    await tickN(102); // seated
+    animator.onState({ kind: "needs_human", reason: "permission" });
+    await tickN(51); // rear-up meow plays out with no answer
+    expect(beat().beat).toBe("alertUp");
+    expect(beat().reverse).toBe(true); // settles back down…
+    await tickN(51);
+    expect(beat().beat).toBe("idle"); // …and keeps you company
+    now += SLEEP_AFTER_MS + 60_000;
+    await tickN(60);
+    expect(beat().beat).toBe("idle"); // but never dozes off while you're needed
+    animator.onState({ kind: "needs_human", reason: "done" }); // you answered; task finished
+    await tickN(51);
+    expect(beat().beat).toBe("walkOut"); // the goodbye
+    await tickN(51);
+    expect(animator.isVisible).toBe(false);
+    expect(diffScreens(comp.screen, user)).toEqual([]);
     animator.stop();
   });
 

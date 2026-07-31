@@ -232,6 +232,7 @@ export class CatAnimator {
         if (this.meowUntilTick > 0) this.meowUntilTick--;
         if (
           this.anim.beat === "idle" &&
+          this.lastState.kind === "working" && // never doze off while YOU are needed
           this.anim.ticks >= (this.opts.settleTicks ?? 50) && // settle in before napping
           t - this.lastActivityAt >= (this.opts.sleepAfterMs ?? SLEEP_AFTER_MS) // …from YOUR last key
         ) {
@@ -245,9 +246,15 @@ export class CatAnimator {
           else if (this.anim.beat === "wakeUp") next = this.wakeTarget;
           else if (this.anim.beat === "sitDown" && this.pendingAlert) next = "alertUp";
           else if (this.anim.beat === "alertUp" && this.anim.reverse) next = this.pendingAlert ? "alertUp" : "idle";
-          else if (this.anim.beat === "alertUp" && this.lastState.kind === "working") {
-            // the prompt was answered before the meow even finished — no exit
-            // owed; rear back down (the same beat backwards) and keep loafing
+          else if (
+            this.anim.beat === "alertUp" &&
+            (this.lastState.kind === "working" ||
+              (this.lastState.kind === "needs_human" && this.lastState.reason !== "done"))
+          ) {
+            // a mid-task meow (prompt, question) is a call, not a goodbye:
+            // rear back down (the same beat backwards, landing on the sitting
+            // anchor) and keep the user company until it's answered. Only a
+            // finished task — or a shoo — ends in the walk-off.
             next = "alertUp";
             reverse = true;
           }
