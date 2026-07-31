@@ -19,7 +19,12 @@ const KITTY_IMG_BASE = 4200; // arbitrary id namespace for catsit
 // canvas — the cat's movement (walking in, sitting, leaving) is the motion
 // baked into the footage itself, so nothing slides. All beats share one crop
 // window; the cell box just has to match its aspect (cells are ~1:2).
-export const VIDEO_ROWS = 13;
+//
+// The box scales with the terminal so a small window isn't half cat:
+// full size needs a tall window, and it never goes below a readable minimum.
+export const VIDEO_ROWS_MAX = 13;
+export const VIDEO_ROWS_MIN = 6;
+export const VIDEO_ROWS_FRACTION = 0.4; // of the terminal's rows
 
 export function detectRenderMode(env: NodeJS.ProcessEnv = process.env): RenderMode {
   const override = env["CATSIT_RENDER"];
@@ -109,17 +114,25 @@ export class SpriteRenderer {
     return this.truecolor ? `48;2;${r};${g};${b}` : `48;5;${rgbTo256(r, g, b)}`;
   }
 
+  // effective kitty rows, refreshed by fit() as the terminal resizes
+  private fitRows = VIDEO_ROWS_MAX;
+
+  /** Scale the cat to the terminal: called by the animator before layout. */
+  fit(termRows: number): void {
+    this.fitRows = Math.min(VIDEO_ROWS_MAX, Math.max(VIDEO_ROWS_MIN, Math.floor(termRows * VIDEO_ROWS_FRACTION)));
+  }
+
   /** Cell footprint of the (shared) canvas in this render mode. */
   get catCols(): number {
     if (this.mode === "kitty") {
       const c = this.frames!.beats.idle;
-      return Math.round((c.w / c.h) * VIDEO_ROWS * 2);
+      return Math.round((c.w / c.h) * this.fitRows * 2);
     }
     return CAT_COLS;
   }
 
   get catRows(): number {
-    return this.mode === "kitty" ? VIDEO_ROWS : CAT_ROWS;
+    return this.mode === "kitty" ? this.fitRows : CAT_ROWS;
   }
 
   /** All kitty beats share one canvas, so the widest footprint == catCols. */

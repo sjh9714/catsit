@@ -315,6 +315,7 @@ export class CatAnimator {
   private render(): void {
     if (this.anim.kind !== "beat") return;
     const t = this.now();
+    this.opts.renderer.fit(this.opts.mirror.rows); // scale to the terminal
     const { beat, ticks } = this.anim;
     this.cur.beat = beat;
     this.cur.beatTicks = ticks;
