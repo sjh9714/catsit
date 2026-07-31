@@ -21,7 +21,7 @@ const KITTY_IMG_BASE = 4200; // arbitrary id namespace for catsit
 // the walking cat's feet stay on the sitting cat's baseline.
 export const VIDEO_ROWS = 9;
 export const VIDEO_COLS = 13; // idle 190×256
-export const WALK_COLS = 29; // walk 420×256
+export const WALK_COLS = 34; // walk 480×256
 
 /** Which frame set a sprite-frame name plays in the kitty tier. */
 function setFor(frame: FrameName): FrameSetName {

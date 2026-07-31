@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const [cutDir, outDir] = process.argv.slice(2);
-const CANVAS_W = 420, CANVAS_H = 256, CAT_H = 140; // cat height inside canvas
+const CANVAS_W = 480, CANVAS_H = 256, CAT_H = 168; // cat height inside canvas
 const files = fs.readdirSync(cutDir).filter((f) => f.endsWith(".png")).sort();
 const probe = execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", path.join(cutDir, files[0])]).toString().trim();
 const [W, H] = probe.split(",").map(Number);

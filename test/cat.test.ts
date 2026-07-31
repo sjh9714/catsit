@@ -55,10 +55,10 @@ async function runLifecycle(mode: RenderMode): Promise<void> {
     await feed(`\x1b[3${i % 8}mrow ${i} abcdefghijklmnopqrstuvwxyz0123456789\x1b[0m\r\n`);
   }
 
-  // working: after the appear delay the cat walks in and loafs
+  // working: after the appear delay the cat walks in (a full gait cycle) and loafs
   animator.onState({ kind: "working" });
   now += APPEAR_DELAY_MS;
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 24; i++) {
     now += 200;
     animator.tick();
     await pump();
@@ -87,10 +87,10 @@ async function runLifecycle(mode: RenderMode): Promise<void> {
     await feed(`\x1b[3;1H\x1b[2K\x1b[35mbubble-phase repaint ${i}\x1b[0m`);
   }
 
-  // needs_human: alert + meow bubble, then walk-out to hidden
+  // needs_human: alert + meow bubble, then the long walk-out to hidden
   animator.onState({ kind: "needs_human", reason: "permission" });
   await pump();
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 40; i++) {
     now += 200;
     animator.tick();
     await pump();

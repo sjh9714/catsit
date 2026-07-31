@@ -20,7 +20,13 @@ type Anim =
   | { kind: "walk-out"; step: number };
 
 const TICK_MS = 100; // fast enough for the kitty video tier's 10fps frames
-const WALK_STEPS = 8;
+// Walking is paced to the real footage's gait (~1 cell/tick ground speed), so
+// the legs visibly stride instead of the sprite sliding: one full 20-frame
+// gait cycle takes 2s, and each walk covers at least one cycle.
+const WALK_IN_STEPS = 22;
+const WALK_OUT_STEPS = 26;
+const TRAVEL_IN = 23; // cells from off-screen right to the anchor
+const TRAVEL_OUT = 30; // cells until the 34-col walk canvas clears the edge
 const SLEEP_AFTER_MS = 90_000;
 const MEOW_HOLD_MS = 1400;
 export const BUBBLE_HOLD_MS = 1400;
@@ -64,8 +70,9 @@ export class CatAnimator {
         if (this.anim.kind === "hidden") {
           this.anim = { kind: "waiting", since: this.now() };
         } else if (this.anim.kind === "walk-out") {
-          // the cat was just here — come straight back, no delay
-          this.anim = { kind: "walk-in", step: WALK_STEPS - this.anim.step };
+          // the cat was just here — come straight back, no delay; map how far
+          // out it got onto the equivalent point of the walk back in
+          this.anim = { kind: "walk-in", step: Math.round((1 - this.anim.step / WALK_OUT_STEPS) * WALK_IN_STEPS) };
         }
         break;
       case "needs_human":
@@ -149,11 +156,11 @@ export class CatAnimator {
         break;
       case "walk-in":
         this.anim.step++;
-        if (this.anim.step >= WALK_STEPS) this.anim = { kind: "loaf", since: t };
+        if (this.anim.step >= WALK_IN_STEPS) this.anim = { kind: "loaf", since: t };
         break;
       case "walk-out":
         this.anim.step++;
-        if (this.anim.step >= WALK_STEPS) {
+        if (this.anim.step >= WALK_OUT_STEPS) {
           this.anim = { kind: "hidden" };
           this.lastRenderKey = "";
           this.opts.log?.("anim hidden (walk-out complete)");
@@ -202,11 +209,11 @@ export class CatAnimator {
     const catCols = this.opts.renderer.catCols;
     const anchorX = Math.max(0, cols - catCols - 2);
     if (this.anim.kind === "walk-in") {
-      const remaining = WALK_STEPS - this.anim.step;
-      return anchorX + Math.round(((catCols + 2) * remaining) / WALK_STEPS);
+      const remaining = WALK_IN_STEPS - this.anim.step;
+      return anchorX + Math.round((TRAVEL_IN * remaining) / WALK_IN_STEPS);
     }
     if (this.anim.kind === "walk-out") {
-      return anchorX + Math.round(((catCols + 2) * this.anim.step) / WALK_STEPS);
+      return anchorX + Math.round((TRAVEL_OUT * this.anim.step) / WALK_OUT_STEPS);
     }
     return anchorX;
   }
@@ -253,15 +260,17 @@ export class CatAnimator {
         return damages();
       },
       // The rect must cover EVERYTHING draw() can paint — bubbles, the hint
-      // line, and the wider walk frames — or hiding leaves orphaned cells.
-      // (maxCols ≥ catCols; walk canvases extend ~(maxCols-catCols)/2 ≤ 8
-      // cells left of cellX, inside the bubble margin.)
-      rect: () => ({
-        x: cur.cellX - 8,
-        y: cur.cellY - 1,
-        w: renderer.maxCols + 10,
-        h: renderer.catRows + 2,
-      }),
+      // line, and the wider walk frames (which extend ceil((maxCols-catCols)/2)
+      // cells left of cellX) — or hiding leaves orphaned cells.
+      rect: () => {
+        const pad = Math.max(8, Math.ceil((renderer.maxCols - renderer.catCols) / 2));
+        return {
+          x: cur.cellX - pad,
+          y: cur.cellY - 1,
+          w: pad + renderer.maxCols + 2,
+          h: renderer.catRows + 2,
+        };
+      },
       draw: (cols, rows) => {
         let s = renderer.draw({ frame: cur.frame, cellX: cur.cellX, cellY: cur.cellY, cols, rows, vtick: cur.vtick });
         const bubbleRow = Math.max(1, cur.cellY); // 1-based CUP row = 0-based cellY-1
