@@ -64,6 +64,22 @@ export function rgbTo256(r: number, g: number, b: number): number {
   return grayDist < cubeDist ? 232 + grayIdx : 16 + 36 * cr + 6 * cg + cb;
 }
 
+// Settle path for alertUp played backwards: full descent, minus a slow meow.
+// The open-mouth zone (roughly frames 26%–66% of the beat) passes at triple
+// speed; the calm top and the seated tail play at full speed.
+let settleCache: { count: number; seq: number[] } | null = null;
+function settleSeq(count: number): number[] {
+  if (settleCache?.count === count) return settleCache.seq;
+  const seq: number[] = [];
+  const mouthHi = Math.round(count * 0.66);
+  const mouthLo = Math.round(count * 0.26);
+  for (let f = count - 1; f > mouthHi; f--) seq.push(f);
+  for (let f = mouthHi; f > mouthLo; f -= 3) seq.push(f);
+  for (let f = mouthLo; f >= 0; f--) seq.push(f);
+  settleCache = { count, seq };
+  return seq;
+}
+
 export interface DrawOpts {
   frame: FrameName; // pose for the pixel-art fallback tiers
   beat: BeatName; // performance beat for the kitty tier
@@ -208,15 +224,22 @@ export class SpriteRenderer {
   beatFrame(beat: BeatName, ticks: number, reverse = false): number {
     const b = this.timing![beat];
     const raw = Math.floor((ticks * b.fps) / 10);
+    if (reverse && beat === "alertUp") {
+      // the settle: alertUp backwards, but the open-mouth frames (~13–31)
+      // pass at triple speed so coming back down never reads as a second cry
+      const seq = settleSeq(b.count);
+      return seq[Math.min(raw, seq.length - 1)]!;
+    }
     const idx = b.loop ? raw % b.count : Math.min(raw, b.count - 1);
     return reverse ? b.count - 1 - idx : idx;
   }
 
   /** True when a one-shot beat has played through at `ticks` animator ticks. */
-  beatDone(beat: BeatName, ticks: number): boolean {
+  beatDone(beat: BeatName, ticks: number, reverse = false): boolean {
     if (this.timing) {
       const b = this.timing[beat];
-      return !b.loop && Math.floor((ticks * b.fps) / 10) >= b.count - 1;
+      const len = reverse && beat === "alertUp" ? settleSeq(b.count).length : b.count;
+      return !b.loop && Math.floor((ticks * b.fps) / 10) >= len - 1;
     }
     // pixel-art tiers have no footage; give each one-shot a nominal length
     const nominal: Record<BeatName, number> = {

@@ -169,8 +169,9 @@ describe("CatAnimator appear delay", () => {
     animator.onState({ kind: "needs_human", reason: "done" });
     expect(bells).toBe(1); // the bell never waits for the animation
     expect(beat().beat).toBe("wakeUp");
-    await tickN(51);
-    expect(beat().beat).toBe("alertUp");
+    await tickN(51); // awake on the sitting anchor → stands up, no crying
+    expect(beat().beat).toBe("sitDown");
+    expect((beat() as { reverse?: boolean }).reverse).toBe(true);
     await tickN(51);
     expect(beat().beat).toBe("walkOut"); // done → the goodbye walk-off
     await tickN(51);
@@ -242,10 +243,10 @@ describe("CatAnimator appear delay", () => {
     expect(beat().beat).toBe("alertUp"); // ...and HOLDS the standing watch
     expect(beat().reverse).toBeFalsy();
     expect(animator.isVisible).toBe(true); // never leaves the screen
-    await tickN(55); // the agent stays busy a while → quiet settle begins
+    await tickN(8); // answered → the quiet settle begins almost at once
     expect(beat().beat).toBe("alertUp");
     expect(beat().reverse).toBe(true);
-    await tickN(51); // rear-down lands on the sitting anchor
+    await tickN(45); // rear-down (meow frames skipped) lands on the anchor
     expect(beat().beat).toBe("idle");
     animator.stop();
   });
@@ -274,11 +275,8 @@ describe("CatAnimator appear delay", () => {
     await tickN(51); // the goodbye rear-up plays out…
     expect(beat().beat).toBe("walkOut"); // …and the cat starts stepping aside
     animator.onState({ kind: "working" }); // you queued the next task mid-exit
-    await tickN(51); // the walk-out finishes connected
-    expect(beat().kind).toBe("waiting"); // NOT hidden: the cat owes a return
-    now += APPEAR_DELAY_MS;
-    await tickN(1);
-    expect(beat().beat).toBe("walkIn"); // and walks right back in
+    await tickN(51); // walk-out finishes, the appear delay passes…
+    expect(beat().beat).toBe("walkIn"); // …and the cat walks right back in
     animator.stop();
   });
 

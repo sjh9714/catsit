@@ -73,7 +73,7 @@ if (parsed.kind === "help") {
   process.exit(process.argv.length > 2 ? 0 : 2);
 }
 if (parsed.kind === "version") {
-  process.stdout.write("catsit 0.5.2\n");
+  process.stdout.write("catsit 0.6.0\n");
   process.exit(0);
 }
 if (parsed.kind === "error") {
@@ -169,7 +169,7 @@ if (!flags.noCat) {
     },
     log: debugLog ?? undefined,
     // the demo naps early so a quick look shows the whole repertoire
-    sleepAfterMs: parsed.kind === "demo" ? Number(process.env["CATSIT_SLEEP_MS"]) || 9000 : undefined,
+    sleepAfterMs: parsed.kind === "demo" ? Number(process.env["CATSIT_SLEEP_MS"]) || 15_000 : undefined,
     settleTicks: parsed.kind === "demo" ? 20 : undefined,
   });
   sm.onChange((next) => animator!.onState(next));
